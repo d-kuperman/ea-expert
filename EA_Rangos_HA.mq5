@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.02"
+#property version   "1.03"
 #property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers)"
 
 //+------------------------------------------------------------------+
@@ -60,6 +60,10 @@ double MAX_C = 0.0, MIN_C = 0.0;
 bool   HAS_RANGO_A = false;
 bool   HAS_RANGO_B = false;
 bool   HAS_RANGO_C = false;
+
+// Estado diario para las futuras reglas de entrada. Se reinicia cada día.
+bool g_setup_invalid_today = false;
+bool g_setup_evaluated_today = false;
 
 // Segundos desde medianoche (00:00 UTC+3) para cada rango
 int g_sec_start_a = 0, g_sec_end_a = 0;
@@ -403,6 +407,83 @@ void DrawRangeLabel(string label_id, datetime t_start, double max_price, string 
 //+------------------------------------------------------------------+
 //| Procesa y dibuja los 3 rangos para un día específico             |
 //+------------------------------------------------------------------+
+// Evalúa precios reales (incluidas mechas), no los OHLC sintéticos Heikin Ashi.
+// La contención requiere AMBAS desigualdades; tocar un límite no es romperlo.
+void EvaluateDaySetup(datetime day_start, datetime evaluation_time, bool is_today)
+{
+   datetime start_a = day_start + g_sec_start_a;
+   datetime end_a = day_start + g_sec_end_a;
+   datetime start_b = day_start + g_sec_start_b;
+   datetime end_b = day_start + g_sec_end_b;
+   if(evaluation_time < end_a || evaluation_time < end_b)
+      return;
+   if(is_today && g_setup_evaluated_today)
+      return;
+   if(end_a <= start_a || end_b <= start_b)
+      return;
+
+   // Leer de nuevo los rangos cerrados evita decidir con el último tick parcial
+   // y permite evaluar días cuyo comienzo quedó fuera de InpMaxBars.
+   MqlRates range_rates[];
+   ArraySetAsSeries(range_rates, false);
+   datetime first = (datetime)MathMin(start_a, start_b);
+   datetime last = (datetime)MathMax(end_a, end_b);
+   int count = CopyRates(_Symbol, PERIOD_M15, day_start, last - 1, range_rates);
+   if(count <= 0 || range_rates[0].time > first)
+      return; // Historia incompleta: no declarar una invalidación.
+
+   double max_a = -DBL_MAX, min_a = DBL_MAX;
+   double max_b = -DBL_MAX, min_b = DBL_MAX;
+   bool has_a = false, has_b = false;
+   for(int i = 0; i < count; i++)
+   {
+      datetime t = range_rates[i].time;
+      if(t >= start_a && t < end_a)
+      {
+         has_a = true;
+         max_a = MathMax(max_a, range_rates[i].high);
+         min_a = MathMin(min_a, range_rates[i].low);
+      }
+      if(t >= start_b && t < end_b)
+      {
+         has_b = true;
+         max_b = MathMax(max_b, range_rates[i].high);
+         min_b = MathMin(min_b, range_rates[i].low);
+      }
+   }
+   if(!has_a || !has_b)
+      return;
+
+   bool invalid = (max_b <= max_a && min_b >= min_a);
+   if(is_today)
+   {
+      g_setup_invalid_today = invalid;
+      g_setup_evaluated_today = true;
+   }
+
+   string name = OBJ_PREFIX + "SETUP_INVALID_" + TimeToString(day_start, TIME_DATE);
+   if(!invalid)
+   {
+      ObjectDelete(0, name);
+      return;
+   }
+
+   // Cartel independiente de InpShowLabels, centrado por encima de RANGO_B.
+   datetime center = start_b + (end_b - start_b) / 2;
+   double label_price = max_b + MathMax((max_b - min_b) * 0.08, 10 * _Point);
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_TEXT, 0, center, label_price);
+   else
+      ObjectMove(0, name, 0, center, label_price);
+   ObjectSetString(0, name, OBJPROP_TEXT, "SETUP NO VÁLIDO");
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 11);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, InpHaBearColor);
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LOWER);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+}
 void ProcessDayRanges(datetime day_start, const MqlRates &rates[], int total_rates, bool is_today)
 {
    DrawDaySeparator(day_start);
@@ -571,6 +652,7 @@ bool InitHistory()
    {
       bool is_today = (unique_days[i] == today);
       ProcessDayRanges(unique_days[i], rates, copied, is_today);
+      EvaluateDaySetup(unique_days[i], rates[copied - 1].time, is_today);
    }
    
    return true;
@@ -588,6 +670,8 @@ void UpdateLiveRanges(const MqlRates &cur_bar)
    if(today != g_current_day)
    {
       g_current_day = today;
+      g_setup_invalid_today = false;
+      g_setup_evaluated_today = false;
       HAS_RANGO_A = false;
       HAS_RANGO_B = false;
       HAS_RANGO_C = false;
@@ -797,6 +881,7 @@ void OnTick()
    
    // Actualizar extremos de rangos si corresponde
    UpdateLiveRanges(current_rates[0]);
+   EvaluateDaySetup(g_current_day, TimeCurrent(), true);
    
    // Refrescar el gráfico suavemente
    ulong now_ms = GetTickCount64();
