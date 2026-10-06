@@ -219,111 +219,39 @@ void SetupChart()
 }
 
 //+------------------------------------------------------------------+
-//| Calcula el ancho de vela con caché de escala (evita CopyTime)    |
+//| Retorna el grosor del cuerpo de la vela según el zoom del gráfico|
 //+------------------------------------------------------------------+
-int GetCurrentBarWidth(double ref_price = 0.0)
+int GetBodyWidthForScale(int scale)
 {
-   static long last_scale = -1;
-   static int  cached_width = 3;
-   
-   long scale = ChartGetInteger(0, CHART_SCALE);
-   if(scale == last_scale && cached_width > 0)
-      return cached_width;
-      
-   if(ref_price <= 0.0)
-      ref_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   if(ref_price <= 0.0)
-      ref_price = 1.0;
-      
-   datetime times[2];
-   int x0, x1, unused_y;
-   if(CopyTime(_Symbol, PERIOD_M15, 0, 2, times) == 2 &&
-      ChartTimePriceToXY(0, 0, times[0], ref_price, x0, unused_y) &&
-      ChartTimePriceToXY(0, 0, times[1], ref_price, x1, unused_y))
+   switch(scale)
    {
-      int spacing = (int)MathAbs(x1 - x0);
-      cached_width = (int)MathMax(1, MathMin(spacing - 1, (int)MathRound(spacing * 0.7)));
-      last_scale = scale;
-      return cached_width;
+      case 0: return 1;
+      case 1: return 2;
+      case 2: return 3;
+      case 3: return 4;
+      case 4: return 5;
+      case 5: return 5;
+      default: return 3;
    }
-   return (cached_width > 0 ? cached_width : 3);
 }
 
 //+------------------------------------------------------------------+
-//| Dibuja o actualiza un rectángulo en coordenadas de píxeles       |
+//| Refresca el grosor de las velas al hacer zoom (+ / -)            |
 //+------------------------------------------------------------------+
-void DrawPixelRectangle(string name, int x, int y, int width, int height, color clr, int chart_width, int chart_height)
-{
-   int right = (int)MathMin(chart_width, x + width);
-   int bottom = (int)MathMin(chart_height, y + height);
-   x = (int)MathMax(0, x);
-   y = (int)MathMax(0, y);
-   if(right <= x || bottom <= y)
-   {
-      ObjectDelete(0, name);
-      return;
-   }
-   if(ObjectFind(0, name) < 0)
-   {
-      if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
-         return;
-      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, name, OBJPROP_BACK, false);
-   }
-   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, name, OBJPROP_XSIZE, right - x);
-   ObjectSetInteger(0, name, OBJPROP_YSIZE, bottom - y);
-   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
-   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
-}
-
-//+------------------------------------------------------------------+
-//| Renderiza una vela Heikin Ashi específica                        |
-//+------------------------------------------------------------------+
-void RenderHACandle(const HACandle &bar, int width, int chart_width, int chart_height)
-{
-   int x, y_open, unused_x, y_close, y_high, y_low;
-   if(!ChartTimePriceToXY(0, 0, bar.time, bar.open, x, y_open) ||
-      !ChartTimePriceToXY(0, 0, bar.time, bar.close, unused_x, y_close) ||
-      !ChartTimePriceToXY(0, 0, bar.time, bar.high, unused_x, y_high) ||
-      !ChartTimePriceToXY(0, 0, bar.time, bar.low, unused_x, y_low))
-   {
-      DeleteHACandle(bar.time);
-      return;
-   }
-
-   color clr = bar.close >= bar.open ? InpHaBullColor : InpHaBearColor;
-   string suffix = IntegerToString((long)bar.time);
-
-   // Mecha y cuerpo
-   DrawPixelRectangle(OBJ_PREFIX + "W_" + suffix, x, y_high, 1,
-                      (int)MathMax(1, y_low - y_high + 1), clr, chart_width, chart_height);
-   DrawPixelRectangle(OBJ_PREFIX + "B_" + suffix, x - width / 2,
-                      (int)MathMin(y_open, y_close), width,
-                      (int)MathMax(1, MathAbs(y_close - y_open)), clr, chart_width, chart_height);
-}
-
-//+------------------------------------------------------------------+
-//| Refresca todas las velas con parámetros precalculados            |
-//+------------------------------------------------------------------+
-void RefreshHACandles()
+void RefreshHACandleWidths()
 {
    if(!g_enable_graphics || g_drawn_count <= 0) return;
-   
-   int width = GetCurrentBarWidth();
-   int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-   int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
-
+   int body_width = GetBodyWidthForScale((int)ChartGetInteger(0, CHART_SCALE));
    for(int i = 0; i < g_drawn_count; i++)
-      RenderHACandle(g_drawn_bars[i], width, chart_width, chart_height);
+   {
+      string body_name = OBJ_PREFIX + "B_" + IntegerToString((long)g_drawn_bars[i].time);
+      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, body_width);
+   }
 }
 
 //+------------------------------------------------------------------+
-//| Registra y actualiza una vela Heikin Ashi                        |
+//| Dibuja o actualiza una vela Heikin Ashi usando anclaje nativo    |
+//| (time, price) para que NUNCA se desplace al mover el gráfico     |
 //+------------------------------------------------------------------+
 void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_low, double ha_close)
 {
@@ -350,12 +278,59 @@ void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_l
    g_drawn_bars[index].low   = ha_low;
    g_drawn_bars[index].close = ha_close;
    
-   if(g_enable_graphics)
+   if(!g_enable_graphics) return;
+
+   color clr = (ha_close >= ha_open) ? InpHaBullColor : InpHaBearColor;
+   string suffix = IntegerToString((long)bar_time);
+   string wick_name = OBJ_PREFIX + "W_" + suffix;
+   string body_name = OBJ_PREFIX + "B_" + suffix;
+
+   // 1. MECHA: OBJ_TREND vertical anclado a bar_time desde ha_low hasta ha_high
+   if(ObjectFind(0, wick_name) < 0)
    {
-      int width = GetCurrentBarWidth(ha_open);
-      int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-      int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
-      RenderHACandle(g_drawn_bars[index], width, chart_width, chart_height);
+      ObjectCreate(0, wick_name, OBJ_TREND, 0, bar_time, ha_low, bar_time, ha_high);
+      ObjectSetInteger(0, wick_name, OBJPROP_RAY_LEFT, false);
+      ObjectSetInteger(0, wick_name, OBJPROP_RAY_RIGHT, false);
+      ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(0, wick_name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, wick_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, wick_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, wick_name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, wick_name, OBJPROP_ZORDER, 10);
+   }
+   else
+   {
+      ObjectMove(0, wick_name, 0, bar_time, ha_low);
+      ObjectMove(0, wick_name, 1, bar_time, ha_high);
+      ObjectSetInteger(0, wick_name, OBJPROP_COLOR, clr);
+   }
+
+   // 2. CUERPO: OBJ_TREND vertical anclado a bar_time desde ha_open hasta ha_close
+   double p_open  = ha_open;
+   double p_close = ha_close;
+   if(p_open == p_close)
+      p_close = p_open + _Point * 0.1; // Altura mínima para que un Doji sea visible
+
+   int body_width = GetBodyWidthForScale((int)ChartGetInteger(0, CHART_SCALE));
+
+   if(ObjectFind(0, body_name) < 0)
+   {
+      ObjectCreate(0, body_name, OBJ_TREND, 0, bar_time, p_open, bar_time, p_close);
+      ObjectSetInteger(0, body_name, OBJPROP_RAY_LEFT, false);
+      ObjectSetInteger(0, body_name, OBJPROP_RAY_RIGHT, false);
+      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, body_width);
+      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, body_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, body_name, OBJPROP_ZORDER, 20);
+   }
+   else
+   {
+      ObjectMove(0, body_name, 0, bar_time, p_open);
+      ObjectMove(0, body_name, 1, bar_time, p_close);
+      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, body_width);
    }
 }
 
@@ -661,14 +636,6 @@ bool InitHistory()
    double ha_open = 0.0, ha_close = 0.0, ha_high = 0.0, ha_low = 0.0;
    double prev_open = 0.0, prev_close = 0.0;
    
-   int width = 0, chart_width = 0, chart_height = 0;
-   if(g_enable_graphics)
-   {
-      width = GetCurrentBarWidth();
-      chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-      chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
-   }
-
    // 1. Cálculo y dibujo de velas Heikin Ashi históricas
    for(int i = 0; i < copied; i++)
    {
@@ -694,17 +661,7 @@ bool InitHistory()
       prev_open  = ha_open;
       prev_close = ha_close;
       
-      int idx = g_drawn_count++;
-      g_drawn_bars[idx].time  = rates[i].time;
-      g_drawn_bars[idx].open  = ha_open;
-      g_drawn_bars[idx].high  = ha_high;
-      g_drawn_bars[idx].low   = ha_low;
-      g_drawn_bars[idx].close = ha_close;
-
-      if(g_enable_graphics)
-      {
-         RenderHACandle(g_drawn_bars[idx], width, chart_width, chart_height);
-      }
+      DrawHACandle(rates[i].time, ha_open, ha_high, ha_low, ha_close);
    }
    
    // Estado de la barra actual (barra 0)
@@ -940,8 +897,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 {
    if(g_enable_graphics && id == CHARTEVENT_CHART_CHANGE && g_history_ready)
    {
-      RefreshHACandles();
-      ChartRedraw(0);
+      static long last_scale = -1;
+      long scale = ChartGetInteger(0, CHART_SCALE);
+      if(scale != last_scale)
+      {
+         RefreshHACandleWidths();
+         last_scale = scale;
+         ChartRedraw(0);
+      }
    }
 }
 
@@ -1018,27 +981,6 @@ void OnTick()
          if(!is_new_bar)
             DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
 
-         static long   last_first = -1, last_scale = -1, last_width = -1, last_height = -1;
-         static double last_min = 0, last_max = 0;
-         long   first     = ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR);
-         long   scale     = ChartGetInteger(0, CHART_SCALE);
-         long   width     = ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-         long   height    = ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
-         double price_min = ChartGetDouble(0, CHART_PRICE_MIN, 0);
-         double price_max = ChartGetDouble(0, CHART_PRICE_MAX, 0);
-         
-         if(is_new_bar || first != last_first || scale != last_scale ||
-            width != last_width || height != last_height ||
-            price_min != last_min || price_max != last_max)
-         {
-            RefreshHACandles();
-            last_first  = first;
-            last_scale  = scale;
-            last_width  = width;
-            last_height = height;
-            last_min    = price_min;
-            last_max    = price_max;
-         }
          ChartRedraw(0);
          g_last_redraw_time = now_ms;
       }
