@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.01"
+#property version   "1.02"
 #property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers)"
 
 //+------------------------------------------------------------------+
@@ -77,7 +77,13 @@ double   g_prev_ha_open  = 0.0;
 double   g_prev_ha_close = 0.0;
 
 // Registro de velas dibujadas para control FIFO
-datetime g_drawn_bars[];
+struct HACandle
+{
+   datetime time;
+   double open, high, low, close;
+};
+HACandle g_drawn_bars[];
+bool g_history_ready = false;
 int      g_drawn_count = 0;
 
 // Registro del día actual procesado
@@ -206,108 +212,100 @@ void SetupChart()
 //+------------------------------------------------------------------+
 //| Dibuja o actualiza una vela Heikin Ashi                          |
 //+------------------------------------------------------------------+
-void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_low, double ha_close)
+void DrawPixelRectangle(string name, int x, int y, int width, int height, color clr)
 {
-   // Ancho temporal del cuerpo: aproximadamente 70% de una vela M15 (900 seg)
-   int period_seconds = 15 * 60; // 900
-   int half_body      = (int)(period_seconds * 0.35); // 315 segundos
-   
-   datetime center     = bar_time + period_seconds / 2;
-   datetime body_left  = center - half_body;
-   datetime body_right = center + half_body;
-   
-   // Clasificación de vela:
-   // if(HA_Close > HA_Open) alcista;
-   // else if(HA_Close < HA_Open) bajista;
-   // else doji;
-   color clr = clrGray;
-   bool is_doji = (ha_close == ha_open);
-   
-   if(ha_close > ha_open)
-      clr = InpHaBullColor;
-   else if(ha_close < ha_open)
-      clr = InpHaBearColor;
-   else
-      clr = InpHaBullColor; // Color base para el Doji
-   
-   string wick_name = OBJ_PREFIX + "W_" + IntegerToString((long)bar_time);
-   string body_name = OBJ_PREFIX + "B_" + IntegerToString((long)bar_time);
-   
-   // 1. MECHA: Línea vertical fina (1 píxel) desde HA_Low hasta HA_High
-   if(ObjectFind(0, wick_name) < 0)
+   int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+   int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+   int right = (int)MathMin(chart_width, x + width);
+   int bottom = (int)MathMin(chart_height, y + height);
+   x = (int)MathMax(0, x);
+   y = (int)MathMax(0, y);
+   if(right <= x || bottom <= y)
    {
-      ObjectCreate(0, wick_name, OBJ_TREND, 0, center, ha_low, center, ha_high);
-      ObjectSetInteger(0, wick_name, OBJPROP_RAY_LEFT, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_RAY_RIGHT, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_HIDDEN, true);
+      ObjectDelete(0, name);
+      return;
    }
-   else
+   if(ObjectFind(0, name) < 0)
    {
-      ObjectMove(0, wick_name, 0, center, ha_low);
-      ObjectMove(0, wick_name, 1, center, ha_high);
+      if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+         return;
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, name, OBJPROP_BACK, false);
    }
-   ObjectSetInteger(0, wick_name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 1);
-   ObjectSetInteger(0, wick_name, OBJPROP_BACK, false);
-   ObjectSetInteger(0, wick_name, OBJPROP_ZORDER, 10);
-   
-   // 2. CUERPO:
-   if(is_doji)
-   {
-      // Doji: Si HA_Open == HA_Close, dibujar pequeña línea horizontal en ese precio
-      // No modificar matemáticamente HA_Close ni HA_Open
-      if(ObjectFind(0, body_name) >= 0)
-      {
-         if(ObjectGetInteger(0, body_name, OBJPROP_TYPE) != OBJ_TREND)
-            ObjectDelete(0, body_name);
-      }
-      
-      if(ObjectFind(0, body_name) < 0)
-      {
-         ObjectCreate(0, body_name, OBJ_TREND, 0, body_left, ha_open, body_right, ha_open);
-         ObjectSetInteger(0, body_name, OBJPROP_RAY_LEFT, false);
-         ObjectSetInteger(0, body_name, OBJPROP_RAY_RIGHT, false);
-         ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
-         ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
-      }
-      else
-      {
-         ObjectMove(0, body_name, 0, body_left, ha_open);
-         ObjectMove(0, body_name, 1, body_right, ha_open);
-      }
-      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, body_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, body_name, OBJPROP_ZORDER, 20);
-   }
-   else
-   {
-      // Cuerpo normal: Rectángulo completamente relleno entre HA_Open y HA_Close
-      if(ObjectFind(0, body_name) >= 0)
-      {
-         if(ObjectGetInteger(0, body_name, OBJPROP_TYPE) != OBJ_RECTANGLE)
-            ObjectDelete(0, body_name);
-      }
-      
-      if(ObjectFind(0, body_name) < 0)
-      {
-         ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, body_left, ha_open, body_right, ha_close);
-         ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
-         ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
-      }
-      else
-      {
-         ObjectMove(0, body_name, 0, body_left, ha_open);
-         ObjectMove(0, body_name, 1, body_right, ha_close);
-      }
-      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, body_name, OBJPROP_FILL, true);
-      ObjectSetInteger(0, body_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, body_name, OBJPROP_ZORDER, 20);
-   }
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_XSIZE, right - x);
+   ObjectSetInteger(0, name, OBJPROP_YSIZE, bottom - y);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
 }
 
+void RenderHACandle(const HACandle &bar)
+{
+   int x, y_open, unused_x, y_close, y_high, y_low;
+   if(!ChartTimePriceToXY(0, 0, bar.time, bar.open, x, y_open) ||
+      !ChartTimePriceToXY(0, 0, bar.time, bar.close, unused_x, y_close) ||
+      !ChartTimePriceToXY(0, 0, bar.time, bar.high, unused_x, y_high) ||
+      !ChartTimePriceToXY(0, 0, bar.time, bar.low, unused_x, y_low))
+   {
+      DeleteHACandle(bar.time);
+      return;
+   }
+
+   // Medir barras reales contiguas: también funciona al cruzar un fin de semana.
+   datetime times[];
+   int x0, x1, unused_y;
+   if(CopyTime(_Symbol, PERIOD_M15, 0, 2, times) != 2 ||
+      !ChartTimePriceToXY(0, 0, times[0], bar.open, x0, unused_y) ||
+      !ChartTimePriceToXY(0, 0, times[1], bar.open, x1, unused_y))
+      return;
+   int spacing = (int)MathAbs(x1 - x0);
+   int width = (int)MathMax(1, MathMin(spacing - 1, MathRound(spacing * 0.7)));
+   color clr = bar.close >= bar.open ? InpHaBullColor : InpHaBearColor;
+   string suffix = IntegerToString((long)bar.time);
+
+   // No usar dos tiempos dentro de M15: se proyectan sobre la misma columna.
+   // Un doji conserva sus precios y se representa con altura mínima de un píxel.
+   DrawPixelRectangle(OBJ_PREFIX + "W_" + suffix, x, y_high, 1,
+                      (int)MathMax(1, y_low - y_high + 1), clr);
+   DrawPixelRectangle(OBJ_PREFIX + "B_" + suffix, x - width / 2,
+                      (int)MathMin(y_open, y_close), width,
+                      (int)MathMax(1, MathAbs(y_close - y_open)), clr);
+}
+
+void RefreshHACandles()
+{
+   for(int i = 0; i < g_drawn_count; i++)
+      RenderHACandle(g_drawn_bars[i]);
+}
+
+void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_low, double ha_close)
+{
+   int index = g_drawn_count - 1;
+   while(index >= 0 && g_drawn_bars[index].time != bar_time)
+      index--;
+   if(index < 0)
+   {
+      if(g_drawn_count >= InpMaxBars)
+      {
+         DeleteHACandle(g_drawn_bars[0].time);
+         for(int i = 1; i < g_drawn_count; i++)
+            g_drawn_bars[i - 1] = g_drawn_bars[i];
+         g_drawn_count--;
+      }
+      index = g_drawn_count++;
+      ArrayResize(g_drawn_bars, g_drawn_count);
+   }
+   g_drawn_bars[index].time = bar_time;
+   g_drawn_bars[index].open = ha_open;
+   g_drawn_bars[index].high = ha_high;
+   g_drawn_bars[index].low = ha_low;
+   g_drawn_bars[index].close = ha_close;
+   RenderHACandle(g_drawn_bars[index]);
+}
 //+------------------------------------------------------------------+
 //| Elimina objetos de una vela por su tiempo de apertura            |
 //+------------------------------------------------------------------+
@@ -538,7 +536,7 @@ bool InitHistory()
       prev_close = ha_close;
       
       DrawHACandle(rates[i].time, ha_open, ha_high, ha_low, ha_close);
-      g_drawn_bars[g_drawn_count++] = rates[i].time;
+
    }
    
    // Estado de la barra actual (barra 0)
@@ -674,6 +672,9 @@ int OnInit()
 {
    Print("=== [EA_Rangos_HA] Inicializando Asesor Experto... ===");
    
+   if(InpMaxBars < 2)
+      return INIT_PARAMETERS_INCORRECT;
+
    // Parsear horarios configurados
    int h_sa, m_sa, h_ea, m_ea;
    int h_sb, m_sb, h_eb, m_eb;
@@ -702,7 +703,7 @@ int OnInit()
    ObjectsDeleteAll(0, OBJ_PREFIX);
    
    // Inicializar datos históricos
-   InitHistory();
+   g_history_ready = InitHistory();
    
    ChartRedraw(0);
    PrintFormat("[EA_Rangos_HA] Configuración horaria (UTC+3 The5ers): A[%s-%s] B[%s-%s] C[%s-%s]",
@@ -725,8 +726,24 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   if(id == CHARTEVENT_CHART_CHANGE && g_history_ready)
+   {
+      RefreshHACandles();
+      ChartRedraw(0);
+   }
+}
+
 void OnTick()
 {
+   // CopyRates puede no estar listo durante OnInit. Nunca calcular desde cero.
+   if(!g_history_ready)
+   {
+      g_history_ready = InitHistory();
+      if(!g_history_ready) return;
+      ChartRedraw(0);
+   }
    MqlRates current_rates[1];
    if(CopyRates(_Symbol, PERIOD_M15, 0, 1, current_rates) <= 0) return;
    
@@ -739,8 +756,23 @@ void OnTick()
       is_new_bar = true;
       
       // La barra anterior queda definitivamente cerrada
-      g_prev_ha_open  = g_curr_ha_open;
-      g_prev_ha_close = g_curr_ha_close;
+      // Consultamos la barra recién cerrada (índice 1) para consolidar sus valores finales exactos
+      MqlRates closed_rates[1];
+      if(CopyRates(_Symbol, PERIOD_M15, 1, 1, closed_rates) > 0)
+      {
+         double closed_ha_close = (closed_rates[0].open + closed_rates[0].high + closed_rates[0].low + closed_rates[0].close) / 4.0;
+         double closed_ha_high  = MathMax(closed_rates[0].high, MathMax(g_curr_ha_open, closed_ha_close));
+         double closed_ha_low   = MathMin(closed_rates[0].low,  MathMin(g_curr_ha_open, closed_ha_close));
+         DrawHACandle(g_last_bar_time, g_curr_ha_open, closed_ha_high, closed_ha_low, closed_ha_close);
+         g_prev_ha_open  = g_curr_ha_open;
+         g_prev_ha_close = closed_ha_close;
+      }
+      else
+      {
+         g_prev_ha_open  = g_curr_ha_open;
+         g_prev_ha_close = g_curr_ha_close;
+      }
+
       g_last_bar_time = bar_time;
       
       // Apertura de la nueva vela Heikin Ashi
@@ -750,19 +782,6 @@ void OnTick()
       g_curr_ha_low   = MathMin(current_rates[0].low,  MathMin(g_curr_ha_open, g_curr_ha_close));
       
       DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
-      
-      // Control FIFO de memoria de objetos
-      if(g_drawn_count >= InpMaxBars && g_drawn_count > 0)
-      {
-         DeleteHACandle(g_drawn_bars[0]);
-         ArrayCopy(g_drawn_bars, g_drawn_bars, 0, 1, g_drawn_count - 1);
-         g_drawn_bars[g_drawn_count - 1] = bar_time;
-      }
-      else
-      {
-         ArrayResize(g_drawn_bars, g_drawn_count + 1);
-         g_drawn_bars[g_drawn_count++] = bar_time;
-      }
    }
    else
    {
@@ -783,6 +802,21 @@ void OnTick()
    ulong now_ms = GetTickCount64();
    if(is_new_bar || (now_ms - g_last_redraw_time > 40))
    {
+      static long last_first = -1, last_scale = -1, last_width = -1, last_height = -1;
+      static double last_min = 0, last_max = 0;
+      long first = ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR);
+      long scale = ChartGetInteger(0, CHART_SCALE);
+      long width = ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+      long height = ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+      double price_min = ChartGetDouble(0, CHART_PRICE_MIN, 0);
+      double price_max = ChartGetDouble(0, CHART_PRICE_MAX, 0);
+      if(is_new_bar || first != last_first || scale != last_scale ||
+         width != last_width || height != last_height ||
+         price_min != last_min || price_max != last_max)
+         RefreshHACandles();
+      last_first = first; last_scale = scale;
+      last_width = width; last_height = height;
+      last_min = price_min; last_max = price_max;
       ChartRedraw(0);
       g_last_redraw_time = now_ms;
    }
