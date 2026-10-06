@@ -5,8 +5,8 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.03"
-#property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers)"
+#property version   "1.04"
+#property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
 //| Parámetros de entrada                                            |
@@ -64,6 +64,11 @@ bool   HAS_RANGO_C = false;
 // Estado diario para las futuras reglas de entrada. Se reinicia cada día.
 bool g_setup_invalid_today = false;
 bool g_setup_evaluated_today = false;
+
+// Detección de entorno y control de gráficos
+bool g_is_tester       = false;
+bool g_is_visual       = false;
+bool g_enable_graphics = true;
 
 // Segundos desde medianoche (00:00 UTC+3) para cada rango
 int g_sec_start_a = 0, g_sec_end_a = 0;
@@ -214,12 +219,41 @@ void SetupChart()
 }
 
 //+------------------------------------------------------------------+
-//| Dibuja o actualiza una vela Heikin Ashi                          |
+//| Calcula el ancho de vela con caché de escala (evita CopyTime)    |
 //+------------------------------------------------------------------+
-void DrawPixelRectangle(string name, int x, int y, int width, int height, color clr)
+int GetCurrentBarWidth(double ref_price = 0.0)
 {
-   int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-   int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+   static long last_scale = -1;
+   static int  cached_width = 3;
+   
+   long scale = ChartGetInteger(0, CHART_SCALE);
+   if(scale == last_scale && cached_width > 0)
+      return cached_width;
+      
+   if(ref_price <= 0.0)
+      ref_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   if(ref_price <= 0.0)
+      ref_price = 1.0;
+      
+   datetime times[2];
+   int x0, x1, unused_y;
+   if(CopyTime(_Symbol, PERIOD_M15, 0, 2, times) == 2 &&
+      ChartTimePriceToXY(0, 0, times[0], ref_price, x0, unused_y) &&
+      ChartTimePriceToXY(0, 0, times[1], ref_price, x1, unused_y))
+   {
+      int spacing = (int)MathAbs(x1 - x0);
+      cached_width = (int)MathMax(1, MathMin(spacing - 1, (int)MathRound(spacing * 0.7)));
+      last_scale = scale;
+      return cached_width;
+   }
+   return (cached_width > 0 ? cached_width : 3);
+}
+
+//+------------------------------------------------------------------+
+//| Dibuja o actualiza un rectángulo en coordenadas de píxeles       |
+//+------------------------------------------------------------------+
+void DrawPixelRectangle(string name, int x, int y, int width, int height, color clr, int chart_width, int chart_height)
+{
    int right = (int)MathMin(chart_width, x + width);
    int bottom = (int)MathMin(chart_height, y + height);
    x = (int)MathMax(0, x);
@@ -247,7 +281,10 @@ void DrawPixelRectangle(string name, int x, int y, int width, int height, color 
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
 }
 
-void RenderHACandle(const HACandle &bar)
+//+------------------------------------------------------------------+
+//| Renderiza una vela Heikin Ashi específica                        |
+//+------------------------------------------------------------------+
+void RenderHACandle(const HACandle &bar, int width, int chart_width, int chart_height)
 {
    int x, y_open, unused_x, y_close, y_high, y_low;
    if(!ChartTimePriceToXY(0, 0, bar.time, bar.open, x, y_open) ||
@@ -259,33 +296,35 @@ void RenderHACandle(const HACandle &bar)
       return;
    }
 
-   // Medir barras reales contiguas: también funciona al cruzar un fin de semana.
-   datetime times[];
-   int x0, x1, unused_y;
-   if(CopyTime(_Symbol, PERIOD_M15, 0, 2, times) != 2 ||
-      !ChartTimePriceToXY(0, 0, times[0], bar.open, x0, unused_y) ||
-      !ChartTimePriceToXY(0, 0, times[1], bar.open, x1, unused_y))
-      return;
-   int spacing = (int)MathAbs(x1 - x0);
-   int width = (int)MathMax(1, MathMin(spacing - 1, MathRound(spacing * 0.7)));
    color clr = bar.close >= bar.open ? InpHaBullColor : InpHaBearColor;
    string suffix = IntegerToString((long)bar.time);
 
-   // No usar dos tiempos dentro de M15: se proyectan sobre la misma columna.
-   // Un doji conserva sus precios y se representa con altura mínima de un píxel.
+   // Mecha y cuerpo
    DrawPixelRectangle(OBJ_PREFIX + "W_" + suffix, x, y_high, 1,
-                      (int)MathMax(1, y_low - y_high + 1), clr);
+                      (int)MathMax(1, y_low - y_high + 1), clr, chart_width, chart_height);
    DrawPixelRectangle(OBJ_PREFIX + "B_" + suffix, x - width / 2,
                       (int)MathMin(y_open, y_close), width,
-                      (int)MathMax(1, MathAbs(y_close - y_open)), clr);
+                      (int)MathMax(1, MathAbs(y_close - y_open)), clr, chart_width, chart_height);
 }
 
+//+------------------------------------------------------------------+
+//| Refresca todas las velas con parámetros precalculados            |
+//+------------------------------------------------------------------+
 void RefreshHACandles()
 {
+   if(!g_enable_graphics || g_drawn_count <= 0) return;
+   
+   int width = GetCurrentBarWidth();
+   int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+   int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+
    for(int i = 0; i < g_drawn_count; i++)
-      RenderHACandle(g_drawn_bars[i]);
+      RenderHACandle(g_drawn_bars[i], width, chart_width, chart_height);
 }
 
+//+------------------------------------------------------------------+
+//| Registra y actualiza una vela Heikin Ashi                        |
+//+------------------------------------------------------------------+
 void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_low, double ha_close)
 {
    int index = g_drawn_count - 1;
@@ -295,26 +334,37 @@ void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_l
    {
       if(g_drawn_count >= InpMaxBars)
       {
-         DeleteHACandle(g_drawn_bars[0].time);
-         for(int i = 1; i < g_drawn_count; i++)
-            g_drawn_bars[i - 1] = g_drawn_bars[i];
+         if(g_enable_graphics)
+            DeleteHACandle(g_drawn_bars[0].time);
+         // Desplazamiento en bloque O(1) de memoria en lugar de bucle for O(N)
+         ArrayCopy(g_drawn_bars, g_drawn_bars, 0, 1, g_drawn_count - 1);
          g_drawn_count--;
       }
       index = g_drawn_count++;
-      ArrayResize(g_drawn_bars, g_drawn_count);
+      if(g_drawn_count > ArraySize(g_drawn_bars))
+         ArrayResize(g_drawn_bars, g_drawn_count + 50);
    }
-   g_drawn_bars[index].time = bar_time;
-   g_drawn_bars[index].open = ha_open;
-   g_drawn_bars[index].high = ha_high;
-   g_drawn_bars[index].low = ha_low;
+   g_drawn_bars[index].time  = bar_time;
+   g_drawn_bars[index].open  = ha_open;
+   g_drawn_bars[index].high  = ha_high;
+   g_drawn_bars[index].low   = ha_low;
    g_drawn_bars[index].close = ha_close;
-   RenderHACandle(g_drawn_bars[index]);
+   
+   if(g_enable_graphics)
+   {
+      int width = GetCurrentBarWidth(ha_open);
+      int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+      int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+      RenderHACandle(g_drawn_bars[index], width, chart_width, chart_height);
+   }
 }
+
 //+------------------------------------------------------------------+
 //| Elimina objetos de una vela por su tiempo de apertura            |
 //+------------------------------------------------------------------+
 void DeleteHACandle(datetime t)
 {
+   if(!g_enable_graphics) return;
    ObjectDelete(0, OBJ_PREFIX + "W_" + IntegerToString((long)t));
    ObjectDelete(0, OBJ_PREFIX + "B_" + IntegerToString((long)t));
 }
@@ -324,7 +374,7 @@ void DeleteHACandle(datetime t)
 //+------------------------------------------------------------------+
 void DrawDaySeparator(datetime day_start)
 {
-   if(!InpShowSeparators) return;
+   if(!g_enable_graphics || !InpShowSeparators) return;
    
    string name = OBJ_PREFIX + "SEP_" + TimeToString(day_start, TIME_DATE);
    if(ObjectFind(0, name) < 0)
@@ -346,6 +396,7 @@ void DrawDaySeparator(datetime day_start)
 //+------------------------------------------------------------------+
 void DrawRangeRectangle(string range_id, datetime t_start, datetime t_end, double max_price, double min_price, color bg_color, string tag)
 {
+   if(!g_enable_graphics) return;
    if(max_price <= 0 || min_price <= 0 || min_price > max_price) return;
    
    string name = OBJ_PREFIX + range_id;
@@ -382,7 +433,7 @@ void DrawRangeRectangle(string range_id, datetime t_start, datetime t_end, doubl
 //+------------------------------------------------------------------+
 void DrawRangeLabel(string label_id, datetime t_start, double max_price, string text)
 {
-   if(!InpShowLabels) return;
+   if(!g_enable_graphics || !InpShowLabels) return;
    
    string name = OBJ_PREFIX + label_id;
    if(ObjectFind(0, name) < 0)
@@ -405,16 +456,15 @@ void DrawRangeLabel(string label_id, datetime t_start, double max_price, string 
 }
 
 //+------------------------------------------------------------------+
-//| Procesa y dibuja los 3 rangos para un día específico             |
+//| Evalúa precios reales y declara setup inválido si Rango B        |
+//| cotiza íntegramente dentro de Rango A                            |
 //+------------------------------------------------------------------+
-// Evalúa precios reales (incluidas mechas), no los OHLC sintéticos Heikin Ashi.
-// La contención requiere AMBAS desigualdades; tocar un límite no es romperlo.
 void EvaluateDaySetup(datetime day_start, datetime evaluation_time, bool is_today)
 {
    datetime start_a = day_start + g_sec_start_a;
-   datetime end_a = day_start + g_sec_end_a;
+   datetime end_a   = day_start + g_sec_end_a;
    datetime start_b = day_start + g_sec_start_b;
-   datetime end_b = day_start + g_sec_end_b;
+   datetime end_b   = day_start + g_sec_end_b;
    if(evaluation_time < end_a || evaluation_time < end_b)
       return;
    if(is_today && g_setup_evaluated_today)
@@ -427,7 +477,7 @@ void EvaluateDaySetup(datetime day_start, datetime evaluation_time, bool is_toda
    MqlRates range_rates[];
    ArraySetAsSeries(range_rates, false);
    datetime first = (datetime)MathMin(start_a, start_b);
-   datetime last = (datetime)MathMax(end_a, end_b);
+   datetime last  = (datetime)MathMax(end_a, end_b);
    int count = CopyRates(_Symbol, PERIOD_M15, day_start, last - 1, range_rates);
    if(count <= 0 || range_rates[0].time > first)
       return; // Historia incompleta: no declarar una invalidación.
@@ -457,9 +507,12 @@ void EvaluateDaySetup(datetime day_start, datetime evaluation_time, bool is_toda
    bool invalid = (max_b <= max_a && min_b >= min_a);
    if(is_today)
    {
-      g_setup_invalid_today = invalid;
+      g_setup_invalid_today   = invalid;
       g_setup_evaluated_today = true;
    }
+
+   if(!g_enable_graphics)
+      return;
 
    string name = OBJ_PREFIX + "SETUP_INVALID_" + TimeToString(day_start, TIME_DATE);
    if(!invalid)
@@ -484,9 +537,14 @@ void EvaluateDaySetup(datetime day_start, datetime evaluation_time, bool is_toda
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
 }
+
+//+------------------------------------------------------------------+
+//| Procesa y dibuja los 3 rangos para un día específico             |
+//+------------------------------------------------------------------+
 void ProcessDayRanges(datetime day_start, const MqlRates &rates[], int total_rates, bool is_today)
 {
-   DrawDaySeparator(day_start);
+   if(g_enable_graphics)
+      DrawDaySeparator(day_start);
    
    datetime t_start_a = day_start + g_sec_start_a;
    datetime t_end_a   = day_start + g_sec_end_a;
@@ -532,12 +590,17 @@ void ProcessDayRanges(datetime day_start, const MqlRates &rates[], int total_rat
       }
    }
    
-   string date_str = TimeToString(day_start, TIME_DATE);
+   string date_str = "";
+   if(g_enable_graphics)
+      date_str = TimeToString(day_start, TIME_DATE);
    
    if(has_a)
    {
-      DrawRangeRectangle("RNG_A_" + date_str, t_start_a, t_end_a, max_a, min_a, InpColorA, "RANGO_A");
-      DrawRangeLabel("LBL_A_" + date_str, t_start_a, max_a, " RANGO_A [MAX: " + DoubleToString(max_a, _Digits) + " | MIN: " + DoubleToString(min_a, _Digits) + "]");
+      if(g_enable_graphics)
+      {
+         DrawRangeRectangle("RNG_A_" + date_str, t_start_a, t_end_a, max_a, min_a, InpColorA, "RANGO_A");
+         DrawRangeLabel("LBL_A_" + date_str, t_start_a, max_a, " RANGO_A [MAX: " + DoubleToString(max_a, _Digits) + " | MIN: " + DoubleToString(min_a, _Digits) + "]");
+      }
       if(is_today)
       {
          MAX_A = max_a;
@@ -548,8 +611,11 @@ void ProcessDayRanges(datetime day_start, const MqlRates &rates[], int total_rat
    
    if(has_b)
    {
-      DrawRangeRectangle("RNG_B_" + date_str, t_start_b, t_end_b, max_b, min_b, InpColorB, "RANGO_B");
-      DrawRangeLabel("LBL_B_" + date_str, t_start_b, max_b, " RANGO_B [MAX: " + DoubleToString(max_b, _Digits) + " | MIN: " + DoubleToString(min_b, _Digits) + "]");
+      if(g_enable_graphics)
+      {
+         DrawRangeRectangle("RNG_B_" + date_str, t_start_b, t_end_b, max_b, min_b, InpColorB, "RANGO_B");
+         DrawRangeLabel("LBL_B_" + date_str, t_start_b, max_b, " RANGO_B [MAX: " + DoubleToString(max_b, _Digits) + " | MIN: " + DoubleToString(min_b, _Digits) + "]");
+      }
       if(is_today)
       {
          MAX_B = max_b;
@@ -560,8 +626,11 @@ void ProcessDayRanges(datetime day_start, const MqlRates &rates[], int total_rat
    
    if(has_c)
    {
-      DrawRangeRectangle("RNG_C_" + date_str, t_start_c, t_end_c, max_c, min_c, InpColorC, "RANGO_C");
-      DrawRangeLabel("LBL_C_" + date_str, t_start_c, max_c, " RANGO_C [MAX: " + DoubleToString(max_c, _Digits) + " | MIN: " + DoubleToString(min_c, _Digits) + "]");
+      if(g_enable_graphics)
+      {
+         DrawRangeRectangle("RNG_C_" + date_str, t_start_c, t_end_c, max_c, min_c, InpColorC, "RANGO_C");
+         DrawRangeLabel("LBL_C_" + date_str, t_start_c, max_c, " RANGO_C [MAX: " + DoubleToString(max_c, _Digits) + " | MIN: " + DoubleToString(min_c, _Digits) + "]");
+      }
       if(is_today)
       {
          MAX_C = max_c;
@@ -581,16 +650,25 @@ bool InitHistory()
    int copied = CopyRates(_Symbol, PERIOD_M15, 0, InpMaxBars, rates);
    if(copied <= 1)
    {
-      PrintFormat("[EA_Rangos_HA] Esperando datos históricos de M15 (disponibles: %d)...", copied);
+      if(g_enable_graphics)
+         PrintFormat("[EA_Rangos_HA] Esperando datos históricos de M15 (disponibles: %d)...", copied);
       return false;
    }
    
-   ArrayResize(g_drawn_bars, copied);
+   ArrayResize(g_drawn_bars, InpMaxBars);
    g_drawn_count = 0;
    
    double ha_open = 0.0, ha_close = 0.0, ha_high = 0.0, ha_low = 0.0;
    double prev_open = 0.0, prev_close = 0.0;
    
+   int width = 0, chart_width = 0, chart_height = 0;
+   if(g_enable_graphics)
+   {
+      width = GetCurrentBarWidth();
+      chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+      chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+   }
+
    // 1. Cálculo y dibujo de velas Heikin Ashi históricas
    for(int i = 0; i < copied; i++)
    {
@@ -616,8 +694,17 @@ bool InitHistory()
       prev_open  = ha_open;
       prev_close = ha_close;
       
-      DrawHACandle(rates[i].time, ha_open, ha_high, ha_low, ha_close);
+      int idx = g_drawn_count++;
+      g_drawn_bars[idx].time  = rates[i].time;
+      g_drawn_bars[idx].open  = ha_open;
+      g_drawn_bars[idx].high  = ha_high;
+      g_drawn_bars[idx].low   = ha_low;
+      g_drawn_bars[idx].close = ha_close;
 
+      if(g_enable_graphics)
+      {
+         RenderHACandle(g_drawn_bars[idx], width, chart_width, chart_height);
+      }
    }
    
    // Estado de la barra actual (barra 0)
@@ -661,7 +748,7 @@ bool InitHistory()
 //+------------------------------------------------------------------+
 //| Actualiza en vivo los rangos de la sesión actual                 |
 //+------------------------------------------------------------------+
-void UpdateLiveRanges(const MqlRates &cur_bar)
+void UpdateLiveRanges(const MqlRates &cur_bar, bool is_new_bar)
 {
    datetime now = cur_bar.time;
    datetime today = GetDayStart(now);
@@ -680,7 +767,8 @@ void UpdateLiveRanges(const MqlRates &cur_bar)
       MAX_C = 0.0; MIN_C = 0.0;
       
       DrawDaySeparator(today);
-      PrintFormat("[EA_Rangos_HA] === Nuevo día detectado: %s 00:00 (UTC+3) ===", TimeToString(today, TIME_DATE));
+      if(g_enable_graphics)
+         PrintFormat("[EA_Rangos_HA] === Nuevo día detectado: %s 00:00 (UTC+3) ===", TimeToString(today, TIME_DATE));
    }
    
    datetime t_start_a = today + g_sec_start_a;
@@ -689,63 +777,86 @@ void UpdateLiveRanges(const MqlRates &cur_bar)
    datetime t_end_b   = today + g_sec_end_b;
    datetime t_start_c = today + g_sec_start_c;
    datetime t_end_c   = today + g_sec_end_c;
-   string date_str    = TimeToString(today, TIME_DATE);
+   string date_str    = "";
+   if(g_enable_graphics)
+      date_str = TimeToString(today, TIME_DATE);
    
    // --- RANGO_A ---
    if(now >= t_start_a && now < t_end_a)
    {
+      bool changed = false;
       if(!HAS_RANGO_A)
       {
          HAS_RANGO_A = true;
          MAX_A = cur_bar.high;
          MIN_A = cur_bar.low;
-         PrintFormat("[EA_Rangos_HA] Iniciando RANGO_A para %s", date_str);
+         changed = true;
+         if(g_enable_graphics)
+            PrintFormat("[EA_Rangos_HA] Iniciando RANGO_A para %s", date_str);
       }
       else
       {
-         if(cur_bar.high > MAX_A) MAX_A = cur_bar.high;
-         if(cur_bar.low  < MIN_A) MIN_A = cur_bar.low;
+         if(cur_bar.high > MAX_A) { MAX_A = cur_bar.high; changed = true; }
+         if(cur_bar.low  < MIN_A) { MIN_A = cur_bar.low;  changed = true; }
       }
-      DrawRangeRectangle("RNG_A_" + date_str, t_start_a, t_end_a, MAX_A, MIN_A, InpColorA, "RANGO_A");
-      DrawRangeLabel("LBL_A_" + date_str, t_start_a, MAX_A, " RANGO_A [MAX: " + DoubleToString(MAX_A, _Digits) + " | MIN: " + DoubleToString(MIN_A, _Digits) + "]");
+      // Actualizar objetos sólo si hubo un nuevo extremo o abrió una nueva vela
+      if(g_enable_graphics && (changed || is_new_bar))
+      {
+         DrawRangeRectangle("RNG_A_" + date_str, t_start_a, t_end_a, MAX_A, MIN_A, InpColorA, "RANGO_A");
+         DrawRangeLabel("LBL_A_" + date_str, t_start_a, MAX_A, " RANGO_A [MAX: " + DoubleToString(MAX_A, _Digits) + " | MIN: " + DoubleToString(MIN_A, _Digits) + "]");
+      }
    }
    
    // --- RANGO_B ---
    if(now >= t_start_b && now < t_end_b)
    {
+      bool changed = false;
       if(!HAS_RANGO_B)
       {
          HAS_RANGO_B = true;
          MAX_B = cur_bar.high;
          MIN_B = cur_bar.low;
-         PrintFormat("[EA_Rangos_HA] Iniciando RANGO_B para %s", date_str);
+         changed = true;
+         if(g_enable_graphics)
+            PrintFormat("[EA_Rangos_HA] Iniciando RANGO_B para %s", date_str);
       }
       else
       {
-         if(cur_bar.high > MAX_B) MAX_B = cur_bar.high;
-         if(cur_bar.low  < MIN_B) MIN_B = cur_bar.low;
+         if(cur_bar.high > MAX_B) { MAX_B = cur_bar.high; changed = true; }
+         if(cur_bar.low  < MIN_B) { MIN_B = cur_bar.low;  changed = true; }
       }
-      DrawRangeRectangle("RNG_B_" + date_str, t_start_b, t_end_b, MAX_B, MIN_B, InpColorB, "RANGO_B");
-      DrawRangeLabel("LBL_B_" + date_str, t_start_b, MAX_B, " RANGO_B [MAX: " + DoubleToString(MAX_B, _Digits) + " | MIN: " + DoubleToString(MIN_B, _Digits) + "]");
+      // Actualizar objetos sólo si hubo un nuevo extremo o abrió una nueva vela
+      if(g_enable_graphics && (changed || is_new_bar))
+      {
+         DrawRangeRectangle("RNG_B_" + date_str, t_start_b, t_end_b, MAX_B, MIN_B, InpColorB, "RANGO_B");
+         DrawRangeLabel("LBL_B_" + date_str, t_start_b, MAX_B, " RANGO_B [MAX: " + DoubleToString(MAX_B, _Digits) + " | MIN: " + DoubleToString(MIN_B, _Digits) + "]");
+      }
    }
    
    // --- RANGO_C ---
    if(now >= t_start_c && now < t_end_c)
    {
+      bool changed = false;
       if(!HAS_RANGO_C)
       {
          HAS_RANGO_C = true;
          MAX_C = cur_bar.high;
          MIN_C = cur_bar.low;
-         PrintFormat("[EA_Rangos_HA] Iniciando RANGO_C para %s", date_str);
+         changed = true;
+         if(g_enable_graphics)
+            PrintFormat("[EA_Rangos_HA] Iniciando RANGO_C para %s", date_str);
       }
       else
       {
-         if(cur_bar.high > MAX_C) MAX_C = cur_bar.high;
-         if(cur_bar.low  < MIN_C) MIN_C = cur_bar.low;
+         if(cur_bar.high > MAX_C) { MAX_C = cur_bar.high; changed = true; }
+         if(cur_bar.low  < MIN_C) { MIN_C = cur_bar.low;  changed = true; }
       }
-      DrawRangeRectangle("RNG_C_" + date_str, t_start_c, t_end_c, MAX_C, MIN_C, InpColorC, "RANGO_C");
-      DrawRangeLabel("LBL_C_" + date_str, t_start_c, MAX_C, " RANGO_C [MAX: " + DoubleToString(MAX_C, _Digits) + " | MIN: " + DoubleToString(MIN_C, _Digits) + "]");
+      // Actualizar objetos sólo si hubo un nuevo extremo o abrió una nueva vela
+      if(g_enable_graphics && (changed || is_new_bar))
+      {
+         DrawRangeRectangle("RNG_C_" + date_str, t_start_c, t_end_c, MAX_C, MIN_C, InpColorC, "RANGO_C");
+         DrawRangeLabel("LBL_C_" + date_str, t_start_c, MAX_C, " RANGO_C [MAX: " + DoubleToString(MAX_C, _Digits) + " | MIN: " + DoubleToString(MIN_C, _Digits) + "]");
+      }
    }
 }
 
@@ -754,7 +865,13 @@ void UpdateLiveRanges(const MqlRates &cur_bar)
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   Print("=== [EA_Rangos_HA] Inicializando Asesor Experto... ===");
+   g_is_tester = (bool)MQLInfoInteger(MQL_TESTER);
+   g_is_visual = (bool)MQLInfoInteger(MQL_VISUAL);
+   // Si está en tester no visual, se apagan todos los gráficos para maximizar rendimiento
+   g_enable_graphics = (!g_is_tester || g_is_visual);
+
+   if(g_enable_graphics)
+      Print("=== [EA_Rangos_HA] Inicializando Asesor Experto... ===");
    
    if(InpMaxBars < 2)
       return INIT_PARAMETERS_INCORRECT;
@@ -779,20 +896,26 @@ int OnInit()
    g_sec_start_c = h_sc * 3600 + m_sc * 60;
    g_sec_end_c   = h_ec * 3600 + m_ec * 60;
    
-   // Guardar y configurar lienzo
-   SaveOriginalChart();
-   SetupChart();
-   
-   // Limpiar cualquier objeto previo del EA
-   ObjectsDeleteAll(0, OBJ_PREFIX);
+   if(g_enable_graphics)
+   {
+      // Guardar y configurar lienzo
+      SaveOriginalChart();
+      SetupChart();
+      
+      // Limpiar cualquier objeto previo del EA
+      ObjectsDeleteAll(0, OBJ_PREFIX);
+   }
    
    // Inicializar datos históricos
    g_history_ready = InitHistory();
    
-   ChartRedraw(0);
-   PrintFormat("[EA_Rangos_HA] Configuración horaria (UTC+3 The5ers): A[%s-%s] B[%s-%s] C[%s-%s]",
-               InpStartTimeA, InpEndTimeA, InpStartTimeB, InpEndTimeB, InpStartTimeC, InpEndTimeC);
-   Print("=== [EA_Rangos_HA] Inicialización completada con éxito ===");
+   if(g_enable_graphics)
+   {
+      ChartRedraw(0);
+      PrintFormat("[EA_Rangos_HA] Configuración horaria (UTC+3 The5ers): A[%s-%s] B[%s-%s] C[%s-%s]",
+                  InpStartTimeA, InpEndTimeA, InpStartTimeB, InpEndTimeB, InpStartTimeC, InpEndTimeC);
+      Print("=== [EA_Rangos_HA] Inicialización completada con éxito ===");
+   }
    return INIT_SUCCEEDED;
 }
 
@@ -801,24 +924,30 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   Print("[EA_Rangos_HA] Desinicializando y limpiando objetos...");
-   ObjectsDeleteAll(0, OBJ_PREFIX);
-   RestoreOriginalChart();
-   Print("[EA_Rangos_HA] Gráfico restaurado correctamente.");
+   if(g_enable_graphics)
+   {
+      Print("[EA_Rangos_HA] Desinicializando y limpiando objetos...");
+      ObjectsDeleteAll(0, OBJ_PREFIX);
+      RestoreOriginalChart();
+      Print("[EA_Rangos_HA] Gráfico restaurado correctamente.");
+   }
 }
 
 //+------------------------------------------------------------------+
-//| Expert tick function                                             |
+//| Manejo de eventos del gráfico                                    |
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   if(id == CHARTEVENT_CHART_CHANGE && g_history_ready)
+   if(g_enable_graphics && id == CHARTEVENT_CHART_CHANGE && g_history_ready)
    {
       RefreshHACandles();
       ChartRedraw(0);
    }
 }
 
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
 void OnTick()
 {
    // CopyRates puede no estar listo durante OnInit. Nunca calcular desde cero.
@@ -826,7 +955,7 @@ void OnTick()
    {
       g_history_ready = InitHistory();
       if(!g_history_ready) return;
-      ChartRedraw(0);
+      if(g_enable_graphics) ChartRedraw(0);
    }
    MqlRates current_rates[1];
    if(CopyRates(_Symbol, PERIOD_M15, 0, 1, current_rates) <= 0) return;
@@ -874,36 +1003,45 @@ void OnTick()
       g_curr_ha_close = (current_rates[0].open + current_rates[0].high + current_rates[0].low + current_rates[0].close) / 4.0;
       g_curr_ha_high  = MathMax(current_rates[0].high, MathMax(g_curr_ha_open, g_curr_ha_close));
       g_curr_ha_low   = MathMin(current_rates[0].low,  MathMin(g_curr_ha_open, g_curr_ha_close));
-      
-      // Actualizar cuerpo y mecha sin crear duplicados
-      DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
    }
    
    // Actualizar extremos de rangos si corresponde
-   UpdateLiveRanges(current_rates[0]);
+   UpdateLiveRanges(current_rates[0], is_new_bar);
    EvaluateDaySetup(g_current_day, TimeCurrent(), true);
    
-   // Refrescar el gráfico suavemente
-   ulong now_ms = GetTickCount64();
-   if(is_new_bar || (now_ms - g_last_redraw_time > 40))
+   // Refrescar el gráfico de forma optimizada y controlada
+   if(g_enable_graphics)
    {
-      static long last_first = -1, last_scale = -1, last_width = -1, last_height = -1;
-      static double last_min = 0, last_max = 0;
-      long first = ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR);
-      long scale = ChartGetInteger(0, CHART_SCALE);
-      long width = ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-      long height = ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
-      double price_min = ChartGetDouble(0, CHART_PRICE_MIN, 0);
-      double price_max = ChartGetDouble(0, CHART_PRICE_MAX, 0);
-      if(is_new_bar || first != last_first || scale != last_scale ||
-         width != last_width || height != last_height ||
-         price_min != last_min || price_max != last_max)
-         RefreshHACandles();
-      last_first = first; last_scale = scale;
-      last_width = width; last_height = height;
-      last_min = price_min; last_max = price_max;
-      ChartRedraw(0);
-      g_last_redraw_time = now_ms;
+      ulong now_ms = GetTickCount64();
+      if(is_new_bar || (now_ms - g_last_redraw_time >= 50))
+      {
+         if(!is_new_bar)
+            DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
+
+         static long   last_first = -1, last_scale = -1, last_width = -1, last_height = -1;
+         static double last_min = 0, last_max = 0;
+         long   first     = ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR);
+         long   scale     = ChartGetInteger(0, CHART_SCALE);
+         long   width     = ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+         long   height    = ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+         double price_min = ChartGetDouble(0, CHART_PRICE_MIN, 0);
+         double price_max = ChartGetDouble(0, CHART_PRICE_MAX, 0);
+         
+         if(is_new_bar || first != last_first || scale != last_scale ||
+            width != last_width || height != last_height ||
+            price_min != last_min || price_max != last_max)
+         {
+            RefreshHACandles();
+            last_first  = first;
+            last_scale  = scale;
+            last_width  = width;
+            last_height = height;
+            last_min    = price_min;
+            last_max    = price_max;
+         }
+         ChartRedraw(0);
+         g_last_redraw_time = now_ms;
+      }
    }
 }
 //+------------------------------------------------------------------+
