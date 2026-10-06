@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.00"
+#property version   "1.01"
 #property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers)"
 
 //+------------------------------------------------------------------+
@@ -15,24 +15,24 @@
 input group "--- RANGO_A ---"
 input string   InpStartTimeA     = "02:00";          // Horario inicio RANGO_A
 input string   InpEndTimeA       = "10:00";          // Horario fin RANGO_A
-input color    InpColorA         = C'255,238,88';    // Color de fondo RANGO_A (#ffee58)
+input color    InpColorA         = C'222,219,186';   // Color de fondo RANGO_A (222,219,186)
 
 //--- RANGO_B ---
 input group "--- RANGO_B ---"
 input string   InpStartTimeB     = "10:00";          // Horario inicio RANGO_B
 input string   InpEndTimeB       = "14:00";          // Horario fin RANGO_B
-input color    InpColorB         = C'91,156,246';    // Color de fondo RANGO_B (#5b9cf6)
+input color    InpColorB         = C'189,200,230';   // Color de fondo RANGO_B (189,200,230)
 
 //--- RANGO_C ---
 input group "--- RANGO_C ---"
 input string   InpStartTimeC     = "14:00";          // Horario inicio RANGO_C
 input string   InpEndTimeC       = "20:00";          // Horario fin RANGO_C
-input color    InpColorC         = C'247,124,128';   // Color de fondo RANGO_C (#f77c80)
+input color    InpColorC         = C'229,196,193';   // Color de fondo RANGO_C (229,196,193)
 
 //--- Velas Heikin Ashi ---
 input group "--- Velas Heikin Ashi ---"
-input color    InpHaBullColor    = C'34,139,34';     // Color velas Alcistas (Verde)
-input color    InpHaBearColor    = C'178,34,34';     // Color velas bajistas (Rojo)
+input color    InpHaBullColor    = C'34,139,34';     // Color velas Alcistas (#228B22)
+input color    InpHaBearColor    = C'178,34,34';     // Color velas bajistas (#B22222)
 
 //--- Lienzo ---
 input group "--- Lienzo ---"
@@ -206,62 +206,106 @@ void SetupChart()
 //+------------------------------------------------------------------+
 //| Dibuja o actualiza una vela Heikin Ashi                          |
 //+------------------------------------------------------------------+
-void DrawHACandle(datetime t, double open, double high, double low, double close)
+void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_low, double ha_close)
 {
-   int period_sec = PeriodSeconds(PERIOD_M15);
-   if(period_sec <= 0) period_sec = 900;
+   // Ancho temporal del cuerpo: aproximadamente 70% de una vela M15 (900 seg)
+   int period_seconds = 15 * 60; // 900
+   int half_body      = (int)(period_seconds * 0.35); // 315 segundos
    
-   datetime t_center = t + period_sec / 2;
-   int half_body = (int)(period_sec * 0.38);
-   datetime t1 = t_center - half_body;
-   datetime t2 = t_center + half_body;
+   datetime center     = bar_time + period_seconds / 2;
+   datetime body_left  = center - half_body;
+   datetime body_right = center + half_body;
    
-   bool is_bull = (close >= open);
-   color clr = is_bull ? InpHaBullColor : InpHaBearColor;
+   // Clasificación de vela:
+   // if(HA_Close > HA_Open) alcista;
+   // else if(HA_Close < HA_Open) bajista;
+   // else doji;
+   color clr = clrGray;
+   bool is_doji = (ha_close == ha_open);
    
-   string wick_name = OBJ_PREFIX + "W_" + IntegerToString((long)t);
-   string body_name = OBJ_PREFIX + "B_" + IntegerToString((long)t);
+   if(ha_close > ha_open)
+      clr = InpHaBullColor;
+   else if(ha_close < ha_open)
+      clr = InpHaBearColor;
+   else
+      clr = InpHaBullColor; // Color base para el Doji
    
-   // 1. Mecha (High a Low centrado)
+   string wick_name = OBJ_PREFIX + "W_" + IntegerToString((long)bar_time);
+   string body_name = OBJ_PREFIX + "B_" + IntegerToString((long)bar_time);
+   
+   // 1. MECHA: Línea vertical fina (1 píxel) desde HA_Low hasta HA_High
    if(ObjectFind(0, wick_name) < 0)
    {
-      ObjectCreate(0, wick_name, OBJ_TREND, 0, t_center, low, t_center, high);
+      ObjectCreate(0, wick_name, OBJ_TREND, 0, center, ha_low, center, ha_high);
       ObjectSetInteger(0, wick_name, OBJPROP_RAY_LEFT, false);
       ObjectSetInteger(0, wick_name, OBJPROP_RAY_RIGHT, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, wick_name, OBJPROP_BACK, false);
       ObjectSetInteger(0, wick_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, wick_name, OBJPROP_HIDDEN, true);
    }
    else
    {
-      ObjectMove(0, wick_name, 0, t_center, low);
-      ObjectMove(0, wick_name, 1, t_center, high);
+      ObjectMove(0, wick_name, 0, center, ha_low);
+      ObjectMove(0, wick_name, 1, center, ha_high);
    }
    ObjectSetInteger(0, wick_name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, wick_name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, wick_name, OBJPROP_ZORDER, 10);
    
-   // 2. Cuerpo (Open a Close)
-   double p1 = open;
-   double p2 = close;
-   if(MathAbs(p1 - p2) < _Point * 0.1)
+   // 2. CUERPO:
+   if(is_doji)
    {
-      p2 = p1 + _Point * 0.5; // Altura mínima para que un Doji sea visible
-   }
-   
-   if(ObjectFind(0, body_name) < 0)
-   {
-      ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, t1, p1, t2, p2);
-      ObjectSetInteger(0, body_name, OBJPROP_FILL, true);
+      // Doji: Si HA_Open == HA_Close, dibujar pequeña línea horizontal en ese precio
+      // No modificar matemáticamente HA_Close ni HA_Open
+      if(ObjectFind(0, body_name) >= 0)
+      {
+         if(ObjectGetInteger(0, body_name, OBJPROP_TYPE) != OBJ_TREND)
+            ObjectDelete(0, body_name);
+      }
+      
+      if(ObjectFind(0, body_name) < 0)
+      {
+         ObjectCreate(0, body_name, OBJ_TREND, 0, body_left, ha_open, body_right, ha_open);
+         ObjectSetInteger(0, body_name, OBJPROP_RAY_LEFT, false);
+         ObjectSetInteger(0, body_name, OBJPROP_RAY_RIGHT, false);
+         ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
+      }
+      else
+      {
+         ObjectMove(0, body_name, 0, body_left, ha_open);
+         ObjectMove(0, body_name, 1, body_right, ha_open);
+      }
+      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, body_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, body_name, OBJPROP_ZORDER, 20);
    }
    else
    {
-      ObjectMove(0, body_name, 0, t1, p1);
-      ObjectMove(0, body_name, 1, t2, p2);
+      // Cuerpo normal: Rectángulo completamente relleno entre HA_Open y HA_Close
+      if(ObjectFind(0, body_name) >= 0)
+      {
+         if(ObjectGetInteger(0, body_name, OBJPROP_TYPE) != OBJ_RECTANGLE)
+            ObjectDelete(0, body_name);
+      }
+      
+      if(ObjectFind(0, body_name) < 0)
+      {
+         ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, body_left, ha_open, body_right, ha_close);
+         ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
+      }
+      else
+      {
+         ObjectMove(0, body_name, 0, body_left, ha_open);
+         ObjectMove(0, body_name, 1, body_right, ha_close);
+      }
+      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, body_name, OBJPROP_FILL, true);
+      ObjectSetInteger(0, body_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, body_name, OBJPROP_ZORDER, 20);
    }
-   ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
 }
 
 //+------------------------------------------------------------------+
@@ -288,6 +332,7 @@ void DrawDaySeparator(datetime day_start)
       ObjectSetInteger(0, name, OBJPROP_COLOR, InpSeparatorColor);
       ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, name, OBJPROP_BACK, true);
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
       ObjectSetString(0, name, OBJPROP_TOOLTIP, "Día nuevo: " + TimeToString(day_start, TIME_DATE) + " 00:00 (UTC+3)");
@@ -308,6 +353,7 @@ void DrawRangeRectangle(string range_id, datetime t_start, datetime t_end, doubl
       ObjectSetInteger(0, name, OBJPROP_COLOR, bg_color);
       ObjectSetInteger(0, name, OBJPROP_FILL, true);
       ObjectSetInteger(0, name, OBJPROP_BACK, true); // Detrás de las velas
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);   // Prioridad visual inferior
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
    }
@@ -316,6 +362,9 @@ void DrawRangeRectangle(string range_id, datetime t_start, datetime t_end, doubl
       ObjectMove(0, name, 0, t_start, max_price);
       ObjectMove(0, name, 1, t_end, min_price);
       ObjectSetInteger(0, name, OBJPROP_COLOR, bg_color);
+      ObjectSetInteger(0, name, OBJPROP_FILL, true);
+      ObjectSetInteger(0, name, OBJPROP_BACK, true);
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
    }
    
    string tooltip = tag + "\n" +
@@ -342,6 +391,7 @@ void DrawRangeLabel(string label_id, datetime t_start, double max_price, string 
       ObjectSetString(0, name, OBJPROP_FONT, "Arial");
       ObjectSetInteger(0, name, OBJPROP_COLOR, clrBlack);
       ObjectSetInteger(0, name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 2);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
    }
@@ -688,7 +738,7 @@ void OnTick()
       // --- NUEVA VELA M15 ABIERTA ---
       is_new_bar = true;
       
-      // La barra anterior queda fijada
+      // La barra anterior queda definitivamente cerrada
       g_prev_ha_open  = g_curr_ha_open;
       g_prev_ha_close = g_curr_ha_close;
       g_last_bar_time = bar_time;
@@ -717,10 +767,12 @@ void OnTick()
    else
    {
       // --- MISMA VELA M15 (TICK EN CURSO) ---
+      // HA_Open permanece fijo desde el comienzo de la vela
       g_curr_ha_close = (current_rates[0].open + current_rates[0].high + current_rates[0].low + current_rates[0].close) / 4.0;
       g_curr_ha_high  = MathMax(current_rates[0].high, MathMax(g_curr_ha_open, g_curr_ha_close));
       g_curr_ha_low   = MathMin(current_rates[0].low,  MathMin(g_curr_ha_open, g_curr_ha_close));
       
+      // Actualizar cuerpo y mecha sin crear duplicados
       DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
    }
    
