@@ -866,7 +866,7 @@ void UpdateLiveRanges(const MqlRates &cur_bar, bool is_new_bar)
 int OnInit()
 {
    g_is_tester = (bool)MQLInfoInteger(MQL_TESTER);
-   g_is_visual = (bool)MQLInfoInteger(MQL_VISUAL);
+   g_is_visual = (bool)MQLInfoInteger(MQL_VISUAL_MODE);
    // Si está en tester no visual, se apagan todos los gráficos para maximizar rendimiento
    g_enable_graphics = (!g_is_tester || g_is_visual);
 
