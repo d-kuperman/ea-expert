@@ -5,13 +5,14 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.07"
+#property version   "1.08"
 #property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
 //| Parámetros de entrada                                            |
 //+------------------------------------------------------------------+
 input group "--- BUY / SELL STOP ---"
+input bool     InpUseRangeA      = true;            // Entradas en RANGO_A (true) / RANGO_B (false)
 input double   InpStopLossPips   = 10.0;            // SL en pips
 input double   InpRiskReward     = 2.0;             // RR
 
@@ -718,7 +719,7 @@ bool PlaceSetupStop(ENUM_ORDER_TYPE type, double entry)
    request.type_time = ORDER_TIME_GTC;
    request.comment = "SETUP B " + TimeToString(g_current_day, TIME_DATE) + (is_buy ? " BUY" : " SELL");
 
-   // No desplazar MAX_A/MIN_A ni enviar a mercado si ya hubo una ruptura.
+   // No desplazar el extremo elegido ni enviar a mercado si ya hubo una ruptura.
    if(MathAbs(request.price - entry) > _Point * 0.01 ||
       request.sl <= 0.0 || request.tp <= 0.0 ||
       direction * (request.price - request.sl) <= 0.0 ||
@@ -879,10 +880,12 @@ void PlaceSetupOrders()
    if(SetupHasExecuted(g_current_day)) return;
    // Un intento por lado y día. No reintentar una ruptura ya perdida al retroceder
    // el precio. Cada fallo queda explicado en el Diario del probador.
-   if(!has_buy) PlaceSetupStop(ORDER_TYPE_BUY_STOP, MAX_A);
+   double buy_entry = InpUseRangeA ? MAX_A : MAX_B;
+   double sell_entry = InpUseRangeA ? MIN_A : MIN_B;
+   if(!has_buy) PlaceSetupStop(ORDER_TYPE_BUY_STOP, buy_entry);
    // La compra podría ejecutarse mientras el servidor procesa su colocación.
    if(!HistorySelect(g_current_day, TimeCurrent()) || SetupHasExecuted(g_current_day)) return;
-   if(!has_sell) PlaceSetupStop(ORDER_TYPE_SELL_STOP, MIN_A);
+   if(!has_sell) PlaceSetupStop(ORDER_TYPE_SELL_STOP, sell_entry);
 }
 
 void ManageBreakeven()
