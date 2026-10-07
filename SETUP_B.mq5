@@ -5,14 +5,17 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.08"
+#property version   "1.09"
 #property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
 //| Parámetros de entrada                                            |
 //+------------------------------------------------------------------+
+input group "-- ENTRADAS RANGO_A / RANGO_B ---"
+input bool     InpUseRangeA      = true;            // RANGO_A (true) / RANGO_B (false)
+input bool     InpCancelSecondEntry = true;         // Cancelar segunda entrada
+
 input group "--- BUY / SELL STOP ---"
-input bool     InpUseRangeA      = true;            // Entradas en RANGO_A (true) / RANGO_B (false)
 input double   InpStopLossPips   = 10.0;            // SL en pips
 input double   InpRiskReward     = 2.0;             // RR
 
@@ -810,14 +813,49 @@ void CancelOppositeSetupOrder(datetime setup_day, ENUM_ORDER_TYPE executed_side)
    }
 }
 
+// true: cancelar al ejecutarse una entrada. false: sólo al cerrar por TP.
+// El historial seleccionado debe incluir el deal de apertura de la posición.
+bool GetSetupCancellation(ulong deal, datetime &setup_day, ENUM_ORDER_TYPE &side)
+{
+   if(InpCancelSecondEntry) return GetExecutedSetup(deal, setup_day, side);
+   if(deal == 0 || HistoryDealGetString(deal, DEAL_SYMBOL) != _Symbol ||
+      (ulong)HistoryDealGetInteger(deal, DEAL_MAGIC) != InpMagicNumber ||
+      (ENUM_DEAL_REASON)HistoryDealGetInteger(deal, DEAL_REASON) != DEAL_REASON_TP)
+      return false;
+   ENUM_DEAL_ENTRY entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
+   if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_OUT_BY) return false;
+   ulong position_id = (ulong)HistoryDealGetInteger(deal, DEAL_POSITION_ID);
+   if(position_id == 0) return false;
+   long close_time = HistoryDealGetInteger(deal, DEAL_TIME_MSC);
+   // Vincular el TP a la última apertura/reversión de esa posición; no usar
+   // el tipo de la orden de cierre, que es el contrario al de la entrada.
+   ulong opening_deal = 0;
+   long opening_time = -1;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+   {
+      ulong candidate = HistoryDealGetTicket(i);
+      if(candidate == deal || (ulong)HistoryDealGetInteger(candidate, DEAL_POSITION_ID) != position_id)
+         continue;
+      ENUM_DEAL_ENTRY candidate_entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(candidate, DEAL_ENTRY);
+      if(candidate_entry != DEAL_ENTRY_IN && candidate_entry != DEAL_ENTRY_INOUT) continue;
+      long candidate_time = HistoryDealGetInteger(candidate, DEAL_TIME_MSC);
+      if(candidate_time <= close_time && candidate_time >= opening_time)
+      {
+         opening_deal = candidate;
+         opening_time = candidate_time;
+      }
+   }
+   return GetExecutedSetup(opening_deal, setup_day, side);
+}
+
 // El llamador selecciona el historial de deals antes de esta consulta.
-bool SetupHasExecuted(datetime day_start)
+bool SetupHasCancellation(datetime day_start)
 {
    for(int i = HistoryDealsTotal() - 1; i >= 0; i--)
    {
       datetime setup_day;
       ENUM_ORDER_TYPE side;
-      if(GetExecutedSetup(HistoryDealGetTicket(i), setup_day, side) && setup_day == day_start)
+      if(GetSetupCancellation(HistoryDealGetTicket(i), setup_day, side) && setup_day == day_start)
          return true;
    }
    return false;
@@ -847,7 +885,7 @@ void ReconcileSetupOCO()
    {
       datetime setup_day;
       ENUM_ORDER_TYPE side;
-      if(GetExecutedSetup(HistoryDealGetTicket(i), setup_day, side))
+      if(GetSetupCancellation(HistoryDealGetTicket(i), setup_day, side))
          CancelOppositeSetupOrder(setup_day, side);
    }
 }
@@ -858,9 +896,17 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
 {
    if(trans.type != TRADE_TRANSACTION_DEAL_ADD || trans.symbol != _Symbol) return;
    if(!HistoryDealSelect(trans.deal)) return;
+   // DEAL_ADD puede anunciar el cierre de una posición cuyo setup sea antiguo.
+   // Cargar su historia sin perder el vínculo con la entrada al buscar el TP.
+   if(!InpCancelSecondEntry)
+   {
+      if((ENUM_DEAL_REASON)HistoryDealGetInteger(trans.deal, DEAL_REASON) != DEAL_REASON_TP) return;
+      ulong position_id = (ulong)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
+      if(!HistorySelectByPosition(position_id)) return;
+   }
    datetime setup_day;
    ENUM_ORDER_TYPE side;
-   if(GetExecutedSetup(trans.deal, setup_day, side))
+   if(GetSetupCancellation(trans.deal, setup_day, side))
       CancelOppositeSetupOrder(setup_day, side);
    // Permitir la recuperación en el siguiente tick, incluso del mismo segundo.
    g_last_oco_check = 0;
@@ -876,15 +922,16 @@ void PlaceSetupOrders()
    bool has_buy = SetupOrderAlreadyExists(ORDER_TYPE_BUY_STOP, g_current_day);
    bool has_sell = SetupOrderAlreadyExists(ORDER_TYPE_SELL_STOP, g_current_day);
    g_setup_orders_processed = true;
-   // No crear el lado faltante si el otro ya se ejecutó antes de un reinicio.
-   if(SetupHasExecuted(g_current_day)) return;
+   // Respetar el modo de cancelación tras un reinicio. Las órdenes ya ejecutadas
+   // o canceladas siguen en el historial y nunca se reponen, aunque cierren por SL.
+   if(SetupHasCancellation(g_current_day)) return;
    // Un intento por lado y día. No reintentar una ruptura ya perdida al retroceder
    // el precio. Cada fallo queda explicado en el Diario del probador.
    double buy_entry = InpUseRangeA ? MAX_A : MAX_B;
    double sell_entry = InpUseRangeA ? MIN_A : MIN_B;
    if(!has_buy) PlaceSetupStop(ORDER_TYPE_BUY_STOP, buy_entry);
-   // La compra podría ejecutarse mientras el servidor procesa su colocación.
-   if(!HistorySelect(g_current_day, TimeCurrent()) || SetupHasExecuted(g_current_day)) return;
+   // Revisar si ocurrió el evento de cancelación mientras se colocaba la compra.
+   if(!HistorySelect(g_current_day, TimeCurrent()) || SetupHasCancellation(g_current_day)) return;
    if(!has_sell) PlaceSetupStop(ORDER_TYPE_SELL_STOP, sell_entry);
 }
 
