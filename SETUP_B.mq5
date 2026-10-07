@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.05"
+#property version   "1.06"
 #property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
@@ -78,6 +78,8 @@ bool g_setup_b_today = false;
 bool g_setup_evaluated_today = false;
 bool g_setup_orders_processed = false;
 datetime g_last_be_error = 0;
+datetime g_last_oco_check = 0;
+datetime g_last_oco_error = 0;
 
 // Detección de entorno y control de gráficos
 bool g_is_tester       = false;
@@ -943,6 +945,117 @@ bool PlaceSetupStop(ENUM_ORDER_TYPE type, double entry)
    return true;
 }
 
+// Identificar el par por símbolo, Magic y día de creación de la orden.
+// Usar la orden de origen evita confundir un cierre por SL/TP con una entrada.
+bool GetExecutedSetup(ulong deal, datetime &setup_day, ENUM_ORDER_TYPE &side)
+{
+   if(deal == 0 || HistoryDealGetString(deal, DEAL_SYMBOL) != _Symbol ||
+      (ulong)HistoryDealGetInteger(deal, DEAL_MAGIC) != InpMagicNumber)
+      return false;
+   ENUM_DEAL_TYPE deal_type = (ENUM_DEAL_TYPE)HistoryDealGetInteger(deal, DEAL_TYPE);
+   if(deal_type != DEAL_TYPE_BUY && deal_type != DEAL_TYPE_SELL) return false;
+   ulong order = (ulong)HistoryDealGetInteger(deal, DEAL_ORDER);
+   if(HistoryOrderSelect(order))
+   {
+      side = (ENUM_ORDER_TYPE)HistoryOrderGetInteger(order, ORDER_TYPE);
+      setup_day = GetDayStart((datetime)HistoryOrderGetInteger(order, ORDER_TIME_SETUP));
+   }
+   else if(OrderSelect(order)) // También cancelar ante una ejecución parcial.
+   {
+      side = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+      setup_day = GetDayStart((datetime)OrderGetInteger(ORDER_TIME_SETUP));
+   }
+   else return false; // El historial puede llegar después del evento; reintentar.
+   return side == ORDER_TYPE_BUY_STOP || side == ORDER_TYPE_SELL_STOP;
+}
+
+void CancelOppositeSetupOrder(datetime setup_day, ENUM_ORDER_TYPE executed_side)
+{
+   if(!TradingAllowed()) return;
+   ENUM_ORDER_TYPE opposite = executed_side == ORDER_TYPE_BUY_STOP ? ORDER_TYPE_SELL_STOP : ORDER_TYPE_BUY_STOP;
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = OrderGetTicket(i);
+      if(ticket == 0 || OrderGetString(ORDER_SYMBOL) != _Symbol ||
+         (ulong)OrderGetInteger(ORDER_MAGIC) != InpMagicNumber ||
+         (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE) != opposite ||
+         GetDayStart((datetime)OrderGetInteger(ORDER_TIME_SETUP)) != setup_day)
+         continue;
+      MqlTradeRequest request = {};
+      MqlTradeResult result = {};
+      request.action = TRADE_ACTION_REMOVE;
+      request.order = ticket;
+      request.symbol = _Symbol;
+      request.magic = InpMagicNumber;
+      bool sent = OrderSend(request, result);
+      if(sent && result.retcode == TRADE_RETCODE_DONE)
+         PrintFormat("[SETUP B] OCO: pendiente contraria #%I64u cancelada (setup %s).",
+                     ticket, TimeToString(setup_day, TIME_DATE));
+      else if(g_last_oco_error == 0 || TimeCurrent() - g_last_oco_error >= 60)
+      {
+         g_last_oco_error = TimeCurrent();
+         PrintFormat("[SETUP B] OCO: cancelación pendiente #%I64u: %u, %s. Se reintentará.",
+                     ticket, result.retcode, result.comment);
+      }
+   }
+}
+
+// El llamador selecciona el historial de deals antes de esta consulta.
+bool SetupHasExecuted(datetime day_start)
+{
+   for(int i = HistoryDealsTotal() - 1; i >= 0; i--)
+   {
+      datetime setup_day;
+      ENUM_ORDER_TYPE side;
+      if(GetExecutedSetup(HistoryDealGetTicket(i), setup_day, side) && setup_day == day_start)
+         return true;
+   }
+   return false;
+}
+
+// Recuperación tras reinicios, eventos fuera de orden o rechazo de cancelación.
+// Incluye pendientes antiguas: el par pertenece al día de creación, no al de ejecución.
+void ReconcileSetupOCO()
+{
+   datetime now = TimeCurrent();
+   if(g_last_oco_check == now || !TradingAllowed()) return;
+   g_last_oco_check = now;
+   datetime first_day = now;
+   bool has_pending = false;
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(OrderGetTicket(i) == 0 || OrderGetString(ORDER_SYMBOL) != _Symbol ||
+         (ulong)OrderGetInteger(ORDER_MAGIC) != InpMagicNumber) continue;
+      ENUM_ORDER_TYPE side = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+      if(side != ORDER_TYPE_BUY_STOP && side != ORDER_TYPE_SELL_STOP) continue;
+      datetime day = GetDayStart((datetime)OrderGetInteger(ORDER_TIME_SETUP));
+      if(day < first_day) first_day = day;
+      has_pending = true;
+   }
+   if(!has_pending || !HistorySelect(first_day, now)) return;
+   for(int i = HistoryDealsTotal() - 1; i >= 0; i--)
+   {
+      datetime setup_day;
+      ENUM_ORDER_TYPE side;
+      if(GetExecutedSetup(HistoryDealGetTicket(i), setup_day, side))
+         CancelOppositeSetupOrder(setup_day, side);
+   }
+}
+
+void OnTradeTransaction(const MqlTradeTransaction &trans,
+                        const MqlTradeRequest &request,
+                        const MqlTradeResult &result)
+{
+   if(trans.type != TRADE_TRANSACTION_DEAL_ADD || trans.symbol != _Symbol) return;
+   if(!HistoryDealSelect(trans.deal)) return;
+   datetime setup_day;
+   ENUM_ORDER_TYPE side;
+   if(GetExecutedSetup(trans.deal, setup_day, side))
+      CancelOppositeSetupOrder(setup_day, side);
+   // Permitir la recuperación en el siguiente tick, incluso del mismo segundo.
+   g_last_oco_check = 0;
+}
+
 void PlaceSetupOrders()
 {
    if(!g_setup_evaluated_today || !g_setup_b_today || g_setup_orders_processed ||
@@ -953,11 +1066,14 @@ void PlaceSetupOrders()
    bool has_buy = SetupOrderAlreadyExists(ORDER_TYPE_BUY_STOP, g_current_day);
    bool has_sell = SetupOrderAlreadyExists(ORDER_TYPE_SELL_STOP, g_current_day);
    g_setup_orders_processed = true;
+   // No crear el lado faltante si el otro ya se ejecutó antes de un reinicio.
+   if(SetupHasExecuted(g_current_day)) return;
    // Un intento por lado y día. No reintentar una ruptura ya perdida al retroceder
    // el precio. Cada fallo queda explicado en el Diario del probador.
    if(!has_buy) PlaceSetupStop(ORDER_TYPE_BUY_STOP, MAX_A);
+   // La compra podría ejecutarse mientras el servidor procesa su colocación.
+   if(!HistorySelect(g_current_day, TimeCurrent()) || SetupHasExecuted(g_current_day)) return;
    if(!has_sell) PlaceSetupStop(ORDER_TYPE_SELL_STOP, MIN_A);
-   // Ambas pendientes son independientes y GTC: no se cancela el lado contrario.
 }
 
 void ManageBreakeven()
@@ -1119,6 +1235,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   ReconcileSetupOCO();
    // Gestionar posiciones aun si la historia de rangos todavía no está lista.
    ManageBreakeven();
    // CopyRates puede no estar listo durante OnInit. Nunca calcular desde cero.
