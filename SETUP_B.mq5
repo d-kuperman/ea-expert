@@ -1,12 +1,12 @@
 //+------------------------------------------------------------------+
-//|                                                 EA_Rangos_HA.mq5 |
+//|                                                 SETUP_B.mq5 |
 //|                                  Copyright 2026, Dany            |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.06"
-#property description "Asesor Experto con Velas Heikin Ashi M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
+#property version   "1.07"
+#property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
 //| Parámetros de entrada                                            |
@@ -41,18 +41,13 @@ input string   InpStartTimeC     = "14:00";          // Horario inicio RANGO_C
 input string   InpEndTimeC       = "20:00";          // Horario fin RANGO_C
 input color    InpColorC         = C'229,196,193';   // Color de fondo RANGO_C (229,196,193)
 
-//--- Velas Heikin Ashi ---
-input group "--- Velas Heikin Ashi ---"
-input color    InpHaBullColor    = C'34,139,34';     // Color velas Alcistas (#228B22)
-input color    InpHaBearColor    = C'178,34,34';     // Color velas bajistas (#B22222)
-
 //--- Lienzo ---
 input group "--- Lienzo ---"
 input color    InpBgColor        = C'219,219,219';   // Color de fondo del lienzo (#dbdbdb)
 
 //--- Visualización Adicional ---
 input group "--- Visualización Adicional ---"
-input int      InpMaxBars        = 500;              // Velas históricas a procesar
+input int      InpMaxBars        = 500;              // Barras M15 históricas para los rangos
 input bool     InpShowSeparators = true;             // Mostrar línea punteada divisoria de días
 input color    InpSeparatorColor = C'120,120,120';   // Color línea divisoria de días
 input bool     InpShowLabels     = true;             // Mostrar etiquetas con MAX y MIN
@@ -91,25 +86,9 @@ int g_sec_start_a = 0, g_sec_end_a = 0;
 int g_sec_start_b = 0, g_sec_end_b = 0;
 int g_sec_start_c = 0, g_sec_end_c = 0;
 
-// Variables de estado de Heikin Ashi
+// Estado del historial y detección de nuevas barras M15 para los rangos
 datetime g_last_bar_time = 0;
-double   g_curr_ha_open  = 0.0;
-double   g_curr_ha_high  = 0.0;
-double   g_curr_ha_low   = 0.0;
-double   g_curr_ha_close = 0.0;
-
-double   g_prev_ha_open  = 0.0;
-double   g_prev_ha_close = 0.0;
-
-// Registro de velas dibujadas para control FIFO
-struct HACandle
-{
-   datetime time;
-   double open, high, low, close;
-};
-HACandle g_drawn_bars[];
 bool g_history_ready = false;
-int      g_drawn_count = 0;
 
 // Registro del día actual procesado
 datetime g_current_day = 0;
@@ -120,7 +99,6 @@ long  g_orig_bg          = 0;
 long  g_orig_fg          = 0;
 long  g_orig_grid        = 0;
 long  g_orig_sep         = 0;
-long  g_orig_line        = 0;
 long  g_orig_candle_bull = 0;
 long  g_orig_candle_bear = 0;
 long  g_orig_chart_down  = 0;
@@ -174,7 +152,6 @@ void SaveOriginalChart()
    g_orig_fg          = ChartGetInteger(0, CHART_COLOR_FOREGROUND);
    g_orig_grid        = ChartGetInteger(0, CHART_SHOW_GRID);
    g_orig_sep         = ChartGetInteger(0, CHART_SHOW_PERIOD_SEP);
-   g_orig_line        = ChartGetInteger(0, CHART_COLOR_CHART_LINE);
    g_orig_candle_bull = ChartGetInteger(0, CHART_COLOR_CANDLE_BULL);
    g_orig_candle_bear = ChartGetInteger(0, CHART_COLOR_CANDLE_BEAR);
    g_orig_chart_down  = ChartGetInteger(0, CHART_COLOR_CHART_DOWN);
@@ -191,7 +168,6 @@ void RestoreOriginalChart()
    ChartSetInteger(0, CHART_COLOR_FOREGROUND, (color)g_orig_fg);
    ChartSetInteger(0, CHART_SHOW_GRID, (bool)g_orig_grid);
    ChartSetInteger(0, CHART_SHOW_PERIOD_SEP, (bool)g_orig_sep);
-   ChartSetInteger(0, CHART_COLOR_CHART_LINE, (color)g_orig_line);
    ChartSetInteger(0, CHART_COLOR_CANDLE_BULL, (color)g_orig_candle_bull);
    ChartSetInteger(0, CHART_COLOR_CANDLE_BEAR, (color)g_orig_candle_bear);
    ChartSetInteger(0, CHART_COLOR_CHART_DOWN, (color)g_orig_chart_down);
@@ -212,14 +188,13 @@ void SetupChart()
    ChartSetInteger(0, CHART_SHOW_GRID, false);
    ChartSetInteger(0, CHART_SHOW_PERIOD_SEP, false);
    
-   // Ocultar velas/barras normales (modo línea invisible)
-   ChartSetInteger(0, CHART_MODE, CHART_LINE);
-   ChartSetInteger(0, CHART_COLOR_CHART_LINE, clrNONE);
-   ChartSetInteger(0, CHART_COLOR_CANDLE_BULL, clrNONE);
-   ChartSetInteger(0, CHART_COLOR_CANDLE_BEAR, clrNONE);
-   ChartSetInteger(0, CHART_COLOR_CHART_DOWN, clrNONE);
-   ChartSetInteger(0, CHART_COLOR_CHART_UP, clrNONE);
-   
+   // Velas japonesas nativas de MT5, basadas en los precios reales.
+   ChartSetInteger(0, CHART_MODE, CHART_CANDLES);
+   ChartSetInteger(0, CHART_COLOR_CANDLE_BULL, C'34,139,34');
+   ChartSetInteger(0, CHART_COLOR_CANDLE_BEAR, C'178,34,34');
+   ChartSetInteger(0, CHART_COLOR_CHART_UP, C'34,139,34');
+   ChartSetInteger(0, CHART_COLOR_CHART_DOWN, C'178,34,34');
+
    // Espacio a la derecha para ver velas en formación
    ChartSetInteger(0, CHART_SHIFT, true);
    ChartSetDouble(0, CHART_SHIFT_SIZE, 10.0);
@@ -232,132 +207,6 @@ void SetupChart()
    }
    
    ChartRedraw(0);
-}
-
-//+------------------------------------------------------------------+
-//| Retorna el grosor del cuerpo de la vela según el zoom del gráfico|
-//+------------------------------------------------------------------+
-int GetBodyWidthForScale(int scale)
-{
-   switch(scale)
-   {
-      case 0: return 1;
-      case 1: return 2;
-      case 2: return 3;
-      case 3: return 4;
-      case 4: return 5;
-      case 5: return 5;
-      default: return 3;
-   }
-}
-
-//+------------------------------------------------------------------+
-//| Refresca el grosor de las velas al hacer zoom (+ / -)            |
-//+------------------------------------------------------------------+
-void RefreshHACandleWidths()
-{
-   if(!g_enable_graphics || g_drawn_count <= 0) return;
-   int body_width = GetBodyWidthForScale((int)ChartGetInteger(0, CHART_SCALE));
-   for(int i = 0; i < g_drawn_count; i++)
-   {
-      string body_name = OBJ_PREFIX + "B_" + IntegerToString((long)g_drawn_bars[i].time);
-      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, body_width);
-   }
-}
-
-//+------------------------------------------------------------------+
-//| Dibuja o actualiza una vela Heikin Ashi usando anclaje nativo    |
-//| (time, price) para que NUNCA se desplace al mover el gráfico     |
-//+------------------------------------------------------------------+
-void DrawHACandle(datetime bar_time, double ha_open, double ha_high, double ha_low, double ha_close)
-{
-   int index = g_drawn_count - 1;
-   while(index >= 0 && g_drawn_bars[index].time != bar_time)
-      index--;
-   if(index < 0)
-   {
-      if(g_drawn_count >= InpMaxBars)
-      {
-         if(g_enable_graphics)
-            DeleteHACandle(g_drawn_bars[0].time);
-         // Desplazamiento en bloque O(1) de memoria en lugar de bucle for O(N)
-         ArrayCopy(g_drawn_bars, g_drawn_bars, 0, 1, g_drawn_count - 1);
-         g_drawn_count--;
-      }
-      index = g_drawn_count++;
-      if(g_drawn_count > ArraySize(g_drawn_bars))
-         ArrayResize(g_drawn_bars, g_drawn_count + 50);
-   }
-   g_drawn_bars[index].time  = bar_time;
-   g_drawn_bars[index].open  = ha_open;
-   g_drawn_bars[index].high  = ha_high;
-   g_drawn_bars[index].low   = ha_low;
-   g_drawn_bars[index].close = ha_close;
-   
-   if(!g_enable_graphics) return;
-
-   color clr = (ha_close >= ha_open) ? InpHaBullColor : InpHaBearColor;
-   string suffix = IntegerToString((long)bar_time);
-   string wick_name = OBJ_PREFIX + "W_" + suffix;
-   string body_name = OBJ_PREFIX + "B_" + suffix;
-
-   // 1. MECHA: OBJ_TREND vertical anclado a bar_time desde ha_low hasta ha_high
-   if(ObjectFind(0, wick_name) < 0)
-   {
-      ObjectCreate(0, wick_name, OBJ_TREND, 0, bar_time, ha_low, bar_time, ha_high);
-      ObjectSetInteger(0, wick_name, OBJPROP_RAY_LEFT, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_RAY_RIGHT, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, wick_name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, wick_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, wick_name, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, wick_name, OBJPROP_ZORDER, 10);
-   }
-   else
-   {
-      ObjectMove(0, wick_name, 0, bar_time, ha_low);
-      ObjectMove(0, wick_name, 1, bar_time, ha_high);
-      ObjectSetInteger(0, wick_name, OBJPROP_COLOR, clr);
-   }
-
-   // 2. CUERPO: OBJ_TREND vertical anclado a bar_time desde ha_open hasta ha_close
-   double p_open  = ha_open;
-   double p_close = ha_close;
-   if(p_open == p_close)
-      p_close = p_open + _Point * 0.1; // Altura mínima para que un Doji sea visible
-
-   int body_width = GetBodyWidthForScale((int)ChartGetInteger(0, CHART_SCALE));
-
-   if(ObjectFind(0, body_name) < 0)
-   {
-      ObjectCreate(0, body_name, OBJ_TREND, 0, bar_time, p_open, bar_time, p_close);
-      ObjectSetInteger(0, body_name, OBJPROP_RAY_LEFT, false);
-      ObjectSetInteger(0, body_name, OBJPROP_RAY_RIGHT, false);
-      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, body_width);
-      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, body_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, body_name, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, body_name, OBJPROP_ZORDER, 20);
-   }
-   else
-   {
-      ObjectMove(0, body_name, 0, bar_time, p_open);
-      ObjectMove(0, body_name, 1, bar_time, p_close);
-      ObjectSetInteger(0, body_name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, body_width);
-   }
-}
-
-//+------------------------------------------------------------------+
-//| Elimina objetos de una vela por su tiempo de apertura            |
-//+------------------------------------------------------------------+
-void DeleteHACandle(datetime t)
-{
-   if(!g_enable_graphics) return;
-   ObjectDelete(0, OBJ_PREFIX + "W_" + IntegerToString((long)t));
-   ObjectDelete(0, OBJ_PREFIX + "B_" + IntegerToString((long)t));
 }
 
 //+------------------------------------------------------------------+
@@ -525,7 +374,7 @@ void EvaluateDaySetup(datetime day_start, datetime evaluation_time, bool is_toda
    ObjectSetString(0, name, OBJPROP_TEXT, "SETUP B");
    ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 11);
-   ObjectSetInteger(0, name, OBJPROP_COLOR, InpHaBearColor);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, C'178,34,34');
    ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LOWER);
    ObjectSetInteger(0, name, OBJPROP_BACK, false);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
@@ -635,7 +484,7 @@ void ProcessDayRanges(datetime day_start, const MqlRates &rates[], int total_rat
 }
 
 //+------------------------------------------------------------------+
-//| Inicializa el historial de velas Heikin Ashi y rangos            |
+//| Inicializa el historial M15 y los rangos diarios                 |
 //+------------------------------------------------------------------+
 bool InitHistory()
 {
@@ -649,49 +498,9 @@ bool InitHistory()
       return false;
    }
    
-   ArrayResize(g_drawn_bars, InpMaxBars);
-   g_drawn_count = 0;
-   
-   double ha_open = 0.0, ha_close = 0.0, ha_high = 0.0, ha_low = 0.0;
-   double prev_open = 0.0, prev_close = 0.0;
-   
-   // 1. Cálculo y dibujo de velas Heikin Ashi históricas
-   for(int i = 0; i < copied; i++)
-   {
-      ha_close = (rates[i].open + rates[i].high + rates[i].low + rates[i].close) / 4.0;
-      if(i == 0)
-      {
-         ha_open = (rates[i].open + rates[i].close) / 2.0;
-      }
-      else
-      {
-         ha_open = (prev_open + prev_close) / 2.0;
-      }
-      ha_high = MathMax(rates[i].high, MathMax(ha_open, ha_close));
-      ha_low  = MathMin(rates[i].low,  MathMin(ha_open, ha_close));
-      
-      if(i == copied - 2)
-      {
-         // Guardar los valores fijos de la penúltima barra (barra 1)
-         g_prev_ha_open  = ha_open;
-         g_prev_ha_close = ha_close;
-      }
-      
-      prev_open  = ha_open;
-      prev_close = ha_close;
-      
-      DrawHACandle(rates[i].time, ha_open, ha_high, ha_low, ha_close);
-   }
-   
-   // Estado de la barra actual (barra 0)
-   int last_idx = copied - 1;
-   g_last_bar_time = rates[last_idx].time;
-   g_curr_ha_open  = ha_open;
-   g_curr_ha_high  = ha_high;
-   g_curr_ha_low   = ha_low;
-   g_curr_ha_close = ha_close;
-   
-   // 2. Procesamiento de días históricos y rangos
+   g_last_bar_time = rates[copied - 1].time;
+
+   // Procesamiento de días históricos y rangos
    datetime unique_days[];
    int day_count = 0;
    datetime last_d = 0;
@@ -1213,24 +1022,6 @@ void OnDeinit(const int reason)
 }
 
 //+------------------------------------------------------------------+
-//| Manejo de eventos del gráfico                                    |
-//+------------------------------------------------------------------+
-void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
-{
-   if(g_enable_graphics && id == CHARTEVENT_CHART_CHANGE && g_history_ready)
-   {
-      static long last_scale = -1;
-      long scale = ChartGetInteger(0, CHART_SCALE);
-      if(scale != last_scale)
-      {
-         RefreshHACandleWidths();
-         last_scale = scale;
-         ChartRedraw(0);
-      }
-   }
-}
-
-//+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
 void OnTick()
@@ -1238,7 +1029,7 @@ void OnTick()
    ReconcileSetupOCO();
    // Gestionar posiciones aun si la historia de rangos todavía no está lista.
    ManageBreakeven();
-   // CopyRates puede no estar listo durante OnInit. Nunca calcular desde cero.
+   // CopyRates puede no estar listo durante OnInit; esperar el historial de rangos.
    if(!g_history_ready)
    {
       g_history_ready = InitHistory();
@@ -1249,50 +1040,9 @@ void OnTick()
    if(CopyRates(_Symbol, PERIOD_M15, 0, 1, current_rates) <= 0) return;
    
    datetime bar_time = current_rates[0].time;
-   bool is_new_bar = false;
-   
-   if(bar_time != g_last_bar_time)
-   {
-      // --- NUEVA VELA M15 ABIERTA ---
-      is_new_bar = true;
-      
-      // La barra anterior queda definitivamente cerrada
-      // Consultamos la barra recién cerrada (índice 1) para consolidar sus valores finales exactos
-      MqlRates closed_rates[1];
-      if(CopyRates(_Symbol, PERIOD_M15, 1, 1, closed_rates) > 0)
-      {
-         double closed_ha_close = (closed_rates[0].open + closed_rates[0].high + closed_rates[0].low + closed_rates[0].close) / 4.0;
-         double closed_ha_high  = MathMax(closed_rates[0].high, MathMax(g_curr_ha_open, closed_ha_close));
-         double closed_ha_low   = MathMin(closed_rates[0].low,  MathMin(g_curr_ha_open, closed_ha_close));
-         DrawHACandle(g_last_bar_time, g_curr_ha_open, closed_ha_high, closed_ha_low, closed_ha_close);
-         g_prev_ha_open  = g_curr_ha_open;
-         g_prev_ha_close = closed_ha_close;
-      }
-      else
-      {
-         g_prev_ha_open  = g_curr_ha_open;
-         g_prev_ha_close = g_curr_ha_close;
-      }
+   bool is_new_bar = (bar_time != g_last_bar_time);
+   g_last_bar_time = bar_time;
 
-      g_last_bar_time = bar_time;
-      
-      // Apertura de la nueva vela Heikin Ashi
-      g_curr_ha_open  = (g_prev_ha_open + g_prev_ha_close) / 2.0;
-      g_curr_ha_close = (current_rates[0].open + current_rates[0].high + current_rates[0].low + current_rates[0].close) / 4.0;
-      g_curr_ha_high  = MathMax(current_rates[0].high, MathMax(g_curr_ha_open, g_curr_ha_close));
-      g_curr_ha_low   = MathMin(current_rates[0].low,  MathMin(g_curr_ha_open, g_curr_ha_close));
-      
-      DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
-   }
-   else
-   {
-      // --- MISMA VELA M15 (TICK EN CURSO) ---
-      // HA_Open permanece fijo desde el comienzo de la vela
-      g_curr_ha_close = (current_rates[0].open + current_rates[0].high + current_rates[0].low + current_rates[0].close) / 4.0;
-      g_curr_ha_high  = MathMax(current_rates[0].high, MathMax(g_curr_ha_open, g_curr_ha_close));
-      g_curr_ha_low   = MathMin(current_rates[0].low,  MathMin(g_curr_ha_open, g_curr_ha_close));
-   }
-   
    // Actualizar extremos de rangos si corresponde
    UpdateLiveRanges(current_rates[0], is_new_bar);
    EvaluateDaySetup(g_current_day, TimeCurrent(), true);
@@ -1304,9 +1054,6 @@ void OnTick()
       ulong now_ms = GetTickCount64();
       if(is_new_bar || (now_ms - g_last_redraw_time >= 50))
       {
-         if(!is_new_bar)
-            DrawHACandle(g_last_bar_time, g_curr_ha_open, g_curr_ha_high, g_curr_ha_low, g_curr_ha_close);
-
          ChartRedraw(0);
          g_last_redraw_time = now_ms;
       }
