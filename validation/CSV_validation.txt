@@ -1,0 +1,11 @@
+PASS: 1003 CSV/source assertions. Nine native-generated CSV files validated.
+These files contain synthetic prices, not market results.
+ByCompression: 8 rows, 115 columns
+ByLondonPosition: 5 rows, 115 columns
+ByPrice0800Position: 7 rows, 115 columns
+ByVolatility: 18 rows, 115 columns
+ByWeekday: 5 rows, 115 columns
+CompressionPriceCross: 58 rows, 115 columns
+Daily: 11 rows, 242 columns
+RunMetadata: 46 rows, 2 columns
+Summary: 1 rows, 125 columns

@@ -1,0 +1,112 @@
+RF	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS high touch/break detected
+DP	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS high MFE includes breakout bar and later highs
+EQ	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS pre-entry low is only an MAE upper bound
+ND	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS first confirmed return minute
+CI	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS possible entry-bar stop retained across future target
+NR	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS unambiguous TP before SL
+RO	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS HIGH_ONLY classification
+LK	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS same-minute both sides unresolved
+DN	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS outside open resolves first side
+CM	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS gap cannot assume boundary fill
+PH	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS NO_BREAK metrics missing, not zero
+JD	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS low MFE symmetric
+LM	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS zero risk protected
+GK	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS missing M1 detected
+IO	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS percentile type 7
+JJ	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS non-overlapping compression boundaries
+DE	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS position edges and outside bins
+CQ	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS 5 digit conversion 100 points equals 10 pips
+MP	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS fixture HIGH_ONLY
+GJ	0	22:28:33.795	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 0
+LP	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS fixture LOW_ONLY
+QD	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 1
+FO	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS fixture HIGH_THEN_LOW
+RQ	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 2
+PK	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS fixture LOW_THEN_HIGH
+KR	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 3
+DH	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS fixture BOTH_ORDER_AMBIGUOUS
+RN	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 4
+FL	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS fixture NO_BREAK
+IK	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 5
+GS	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS London exact boundary invalidates 6
+FF	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 6
+JH	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS London exact boundary invalidates 7
+CM	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 7
+RJ	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS NY gap keeps setup known without outcomes
+HH	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 8
+JS	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS Asia gap is UNKNOWN, not invalid
+OG	0	22:28:33.796	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 9
+EL	0	22:28:33.798	CompressionSelfTest (EURUSD,M1)	PASS prior-day ATR14 Wilder and ADR20 context
+MO	0	22:28:33.798	CompressionSelfTest (EURUSD,M1)	PASS context excludes current day
+DF	0	22:28:33.798	CompressionSelfTest (EURUSD,M1)	PASS missing weekday breaks context chain
+GG	0	22:28:33.798	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 0
+CM	0	22:28:33.799	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 1
+RK	0	22:28:33.799	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 2
+MQ	0	22:28:33.799	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 3
+DN	0	22:28:33.799	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 4
+GD	0	22:28:33.799	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 5
+GR	0	22:28:33.800	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 6
+DH	0	22:28:33.800	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 7
+EQ	0	22:28:33.800	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 8
+JO	0	22:28:33.800	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 9
+FF	0	22:28:33.800	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 10
+JO	0	22:28:33.809	CompressionSelfTest (EURUSD,M1)	PASS nine synthetic CSV files written
+RR	0	22:28:33.809	CompressionSelfTest (EURUSD,M1)	SELF TESTS: ALL PASSED, failures=0
+LI	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS high touch/break detected
+JS	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS high MFE includes breakout bar and later highs
+CP	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS pre-entry low is only an MAE upper bound
+PE	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS first confirmed return minute
+IJ	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS possible entry-bar stop retained across future target
+PS	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS unambiguous TP before SL
+HO	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS HIGH_ONLY classification
+RD	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS same-minute both sides unresolved
+JO	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS outside open resolves first side
+MN	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS gap cannot assume boundary fill
+JI	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS NO_BREAK metrics missing, not zero
+DS	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS low MFE symmetric
+RN	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS zero risk protected
+EJ	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS missing M1 detected
+CN	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS percentile type 7
+DI	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS non-overlapping compression boundaries
+FF	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS position edges and outside bins
+EP	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS 5 digit conversion 100 points equals 10 pips
+HQ	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS backward server clock repeated minutes
+DH	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS clock fold interval is half open
+ON	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS fixture HIGH_ONLY
+EP	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 0
+CF	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS fixture LOW_ONLY
+NR	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 1
+MD	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS fixture HIGH_THEN_LOW
+RO	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS opposite side measured after each breakout independently
+OM	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 2
+QG	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS fixture LOW_THEN_HIGH
+FI	0	22:37:01.671	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 3
+DL	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS fixture BOTH_ORDER_AMBIGUOUS
+RF	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS possible intrabar opposite followed by confirmed later opposite
+JJ	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 4
+FQ	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS fixture NO_BREAK
+QD	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 5
+GN	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS London exact boundary invalidates 6
+FS	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 6
+JK	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS London exact boundary invalidates 7
+CN	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 7
+JO	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS NY gap keeps setup known without outcomes
+HE	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 8
+JN	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS Asia gap is UNKNOWN, not invalid
+OP	0	22:37:01.672	CompressionSelfTest (EURUSD,M1)	PASS exclusive NY end 9
+PI	0	22:37:01.673	CompressionSelfTest (EURUSD,M1)	PASS prior-day ATR14 Wilder and ADR20 context
+HR	0	22:37:01.673	CompressionSelfTest (EURUSD,M1)	PASS context excludes current day
+IQ	0	22:37:01.673	CompressionSelfTest (EURUSD,M1)	PASS missing weekday breaks context chain
+GK	0	22:37:01.674	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 0
+LP	0	22:37:01.674	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 1
+QN	0	22:37:01.674	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 2
+ED	0	22:37:01.675	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 3
+DR	0	22:37:01.675	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 4
+OK	0	22:37:01.675	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 5
+NQ	0	22:37:01.675	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 6
+IO	0	22:37:01.675	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 7
+QE	0	22:37:01.676	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 8
+FR	0	22:37:01.676	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 9
+RK	0	22:37:01.676	CompressionSelfTest (EURUSD,M1)	PASS stable daily schema 10
+PJ	0	22:37:01.686	CompressionSelfTest (EURUSD,M1)	PASS nine synthetic CSV files written
+HQ	0	22:37:01.686	CompressionSelfTest (EURUSD,M1)	SELF TESTS: ALL PASSED, failures=0
