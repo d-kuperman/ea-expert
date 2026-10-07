@@ -168,7 +168,9 @@ El cierre semanal, pausas del bróker o huecos pueden dejar días con menos de 1
 6. Escribir una fila Daily por fecha solicitada.
 7. Agregar exclusivamente setups válidos con NY completo; exportar las tablas y metadatos.
 
-La descarga puede tardar, y está limitada por el histórico del bróker y `TERMINAL_MAXBARS`. `HistoryRetries` no puede recuperar datos que el servidor no ofrece. El Journal muestra warmup, progreso periódico, errores de archivos y ruta final. Una cancelación puede dejar archivos parciales; comprobar siempre `RunMetadata.RunStatus=COMPLETE` antes de analizar una ejecución. `COMPLETE` confirma que terminó la ejecución, **no** que todos los días tengan cobertura completa.
+La descarga puede tardar, y está limitada por el histórico del bróker y `TERMINAL_MAXBARS`. La versión 1.01 comprueba **antes de sobrescribir Daily** que el límite de barras cubra todo el período M1 solicitado más el warmup; también prueba si existen velas cerca del inicio y del final. Si falla, escribe `Diagnostic.csv` con `MAX_BARS_TOO_LOW`, `HISTORY_START_UNAVAILABLE` o `HISTORY_END_UNAVAILABLE`. Un límite suficiente no garantiza que el bróker conserve los datos: hay que observar la cobertura real de Daily. `HistoryRetries` no puede recuperar datos que el servidor no ofrece.
+
+El Journal muestra warmup, progreso `días procesados/días solicitados`, errores de archivos y ruta final. Una interrupción puede dejar archivos parciales; comprobar siempre `RunMetadata.RunStatus=COMPLETE` antes de analizar una ejecución. `CANCELLED_PARTIAL` significa que MT5 retiró o detuvo el script antes de finalizar; `LastWrittenDate` indica hasta dónde llegó. Dejar abierto el gráfico y la instancia hasta ver `Research COMPLETE`. `COMPLETE` confirma que terminó la ejecución, **no** que todos los días tengan cobertura completa.
 
 ## CSV generados y denominadores
 
@@ -230,7 +232,7 @@ Familias de las tablas agrupadas: grupo/subgrupo; cantidad; direcciones; ambos l
 2. Menú **Archivo → Abrir carpeta de datos**.
 3. Copiar `EURUSD_AsiaLondonCompression.mq5` a `MQL5\Scripts\` de esa carpeta. Se puede copiar también el `.ex5` entregado.
 4. Abrir el `.mq5` en MetaEditor y pulsar **F7**. Verificar 0 errores y 0 warnings.
-5. En MT5, **Herramientas → Opciones → Gráficos → Máx. barras en gráfico**: configurar un límite suficiente para todos los años M1 y reiniciar MT5 si lo solicita. El límite debe superar ampliamente la cantidad de minutos de mercado del período. Por ejemplo, varios millones para varios años; no basta con el rango de una sola solicitud diaria.
+5. En MT5, **Herramientas → Opciones → Gráficos → Máx. barras en gráfico**: configurar un límite suficiente para todos los años M1 y reiniciar MT5 si lo solicita. El script informa el mínimo concreto en `MAX_BARS_TOO_LOW`. Para 2020-01-01 a 2026-10-06 con 120 días de warmup exige **al menos 3.735.360**; usar un valor mayor, por ejemplo 5.000.000. El límite anterior de 100.000 impidió observar 2020.
 6. En **Observación del mercado**, mostrar el símbolo exacto del bróker (`EURUSD`, `EURUSD.a`, etc.). Con conexión al servidor, se puede solicitar M1 desde **Símbolos → Barras** para precargar el histórico y comprobar sus fechas disponibles.
 7. Abrir cualquier gráfico y timeframe. En **Navegador → Scripts**, actualizar si es necesario y arrastrar el script al gráfico. El gráfico puede ser de otro timeframe; `StudySymbol` selecciona el instrumento analizado.
 8. Configurar `StartDate` y `EndDate` en fechas del reloj UTC-3, ambas inclusivas. Se ignora la parte horaria de esos dos inputs.
@@ -264,7 +266,7 @@ Con `UseCommonFiles=true`:
 
 El Journal imprime la ruta absoluta real. No se guardan por defecto al lado del fuente ni en la carpeta de instalación de Program Files. La separación entre carpeta del terminal y carpeta común sigue [FileOpen de MQL5](https://www.mql5.com/en/docs/files/fileopen).
 
-Si falla la configuración horaria o el símbolo **antes** de iniciar el estudio, aparece una alerta y se escribe `<prefijo>Diagnostic.csv` en esa carpeta, con `TimeUTC,Code,Detail,Symbol,StartDate,EndDate`. En ese caso no hay Daily ni Summary de la ejecución fallida. La pestaña **Expertos** también muestra `RESEARCH STOPPED` y la ruta exacta. Un fallo posterior de escritura se informa en Expertos como `CSV write failure`.
+Si falla la configuración horaria, el símbolo, el límite de barras o la disponibilidad de M1 **antes** de iniciar el estudio, aparece una alerta y se escribe `<prefijo>Diagnostic.csv` en esa carpeta, con `TimeUTC,Code,Detail,Symbol,StartDate,EndDate`. En ese caso no se crean nuevos Daily ni Summary; los CSV de ejecuciones anteriores permanecen y pueden estar incompletos. La pestaña **Expertos** también muestra `RESEARCH STOPPED` y la ruta exacta. Un fallo posterior de escritura se informa en Expertos como `CSV write failure`.
 
 ### Pruebas sintéticas reproducibles
 

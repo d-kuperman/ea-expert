@@ -1,6 +1,6 @@
 // Statistical research script. No order, position or indicator APIs.
 #property copyright "Statistical research"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 #property script_show_inputs
 
@@ -213,8 +213,11 @@ int LoadLocal(const datetime lo,const datetime hi,MqlRates &out[])
          ResetLastError();
          n=CopyRates(StudySymbol,PERIOD_M1,a+g_offset_minutes[s]*60,b+g_offset_minutes[s]*60-1,bars);
          if(n>=(int)((b-a)/60)) break;
-         if(n>=0 && n==last && (bool)SeriesInfoInteger(StudySymbol,PERIOD_M1,SERIES_SYNCHRONIZED)) break;
+         bool synced=(bool)SeriesInfoInteger(StudySymbol,PERIOD_M1,SERIES_SYNCHRONIZED);
+         if(n>=0 && n==last && synced) break;
          last=n;
+         // A synchronized series with a stable partial result needs no retry delay.
+         if(n>=0 && synced) continue;
          if(attempt+1<HistoryRetries) Sleep(RetryDelayMilliseconds);
         }
       int old=ArraySize(out);
@@ -705,7 +708,7 @@ void Meta(const int h,const string key,const string value)
 void WriteMetadata(const string run_status,const datetime begun)
   {
    int h=OpenCSV("RunMetadata"); if(h==INVALID_HANDLE) return;
-   WriteLine(h,"Key,Value"); Meta(h,"Version","1.00"); Meta(h,"RunStatus",run_status);
+   WriteLine(h,"Key,Value"); Meta(h,"Version","1.01"); Meta(h,"RunStatus",run_status);
    Meta(h,"StartedUTC",T(begun)); Meta(h,"CompletedUTC",T(TimeGMT()));
    Meta(h,"DataSnapshotUTC",T(g_now_utc)); Meta(h,"Symbol",StudySymbol);
    Meta(h,"StartDate",T(Midnight(StartDate))); Meta(h,"EndDate",T(Midnight(EndDate)));
@@ -721,6 +724,9 @@ void WriteMetadata(const string run_status,const datetime begun)
    Meta(h,"MaxBars",IntegerToString(TerminalInfoInteger(TERMINAL_MAXBARS)));
    Meta(h,"TerminalBuild",IntegerToString(TerminalInfoInteger(TERMINAL_BUILD)));
    Meta(h,"RowsWritten",I(ArraySize(g_days))); Meta(h,"UseCommonFiles",B(UseCommonFiles));
+   Meta(h,"LastWrittenDate",ArraySize(g_days)>0?T(g_days[ArraySize(g_days)-1].date):"");
+   Meta(h,"RequestedCalendarDays",IntegerToString((long)(Midnight(EndDate)-Midnight(StartDate))/86400+1));
+   Meta(h,"RequiredM1Bars",IntegerToString(RequiredM1Bars()));
    Meta(h,"OutputFolder",g_dir); Meta(h,"OutputPrefix",g_prefix);
    Meta(h,"PriceSource","Broker M1 OHLC; no spread, commissions, swaps or slippage");
    Meta(h,"TimePrecision","M1 bar opening time, not exact tick time; first tied extremum retained");
@@ -908,6 +914,23 @@ bool ValidateInputs()
       ||StringFind(RunTag,"/")>=0||StringFind(RunTag,"\\")>=0) return false;
    return true;
   }
+long RequiredM1Bars()
+  {
+   datetime first=Midnight(StartDate)-(ContextWarmupCalendarDays+2)*86400;
+   datetime last=Midnight(EndDate)+2*86400;
+   return (long)(last-first)/60;
+  }
+bool ProbeHistory(const datetime lo,const datetime hi)
+  {
+   MqlRates sample[];
+   for(int attempt=0;attempt<8&&!IsStopped();attempt++)
+     {
+      int bars=LoadLocal(lo,hi,sample);
+      if(bars>0) return true;
+      if(attempt<7) Sleep(1000);
+     }
+   return false;
+  }
 void OnStart()
   {
    if(RunSelfTestsOnly) { SelfTests(); return; }
@@ -936,12 +959,41 @@ void OnStart()
    g_pip=(g_digits==3||g_digits==5)?10*g_point:g_point;
    if(g_point<=0) { ShowStartupError("INVALID_SYMBOL_POINT","El simbolo no tiene SYMBOL_POINT valido."); return; }
    g_now_utc=TimeGMT(); datetime begun=g_now_utc;
+   long max_bars=TerminalInfoInteger(TERMINAL_MAXBARS);
+   long required=RequiredM1Bars();
+   if(max_bars<required)
+     {
+      ShowStartupError("MAX_BARS_TOO_LOW",
+         "MT5 Max. barras en grafico="+IntegerToString(max_bars)+
+         "; el periodo M1 solicitado requiere al menos "+IntegerToString(required)+
+         ". Aumentar el limite, reiniciar MT5 y precargar M1. Se conservaron los CSV anteriores; no son resultados nuevos.");
+      return;
+     }
+   datetime start=Midnight(StartDate),end=Midnight(EndDate);
+   Print("Preflight M1: MaxBars=",max_bars," required>=",required,
+         "; checking first and last requested weeks before creating CSVs.");
+   if(!ProbeHistory(start,start+7*86400))
+     {
+      if(!IsStopped()) ShowStartupError("HISTORY_START_UNAVAILABLE",
+         "No hay ninguna vela M1 de "+StudySymbol+" en la primera semana solicitada desde "+T(start)+
+         ". Precargar el historico del broker o mover StartDate. Se conservaron los CSV anteriores.");
+      return;
+     }
+   datetime last_probe=end;
+   datetime current_study_date=Midnight(g_now_utc+UTCOffset*3600);
+   if(last_probe>current_study_date) last_probe=current_study_date;
+   if(!ProbeHistory(last_probe-7*86400,last_probe+86400))
+     {
+      if(!IsStopped()) ShowStartupError("HISTORY_END_UNAVAILABLE",
+         "No hay velas M1 de "+StudySymbol+" cerca del final solicitado "+T(last_probe)+
+         ". Precargar el historico del broker y revisar EndDate. Se conservaron los CSV anteriores.");
+      return;
+     }
    WriteMetadata("RUNNING",begun); if(!g_io_ok) return;
    int daily=OpenCSV("Daily"); if(daily==INVALID_HANDLE) return;
    DayResult empty; InitDay(empty,Midnight(StartDate)); string header; DailyRow(empty,header);
    WriteLine(daily,header); g_header=header;
    ArrayResize(g_days,0); ArrayResize(g_context,0);
-   datetime start=Midnight(StartDate),end=Midnight(EndDate);
    datetime warm=start-ContextWarmupCalendarDays*86400;
    MqlRates previous[],current[],next[];
    LoadLocal(warm-86400,warm,previous); LoadLocal(warm,warm+86400,current);
@@ -965,7 +1017,13 @@ void OnStart()
          if(!WriteLine(daily,row)) break;
          int size=ArraySize(g_days); ArrayResize(g_days,size+1,512); g_days[size]=day;
          processed++;
-         if(processed%ProgressEveryDays==0) { Print("Progress ",T(date)," | days=",processed," | ",day.status); FileFlush(daily); }
+         if(processed%ProgressEveryDays==0)
+           {
+            long requested=(long)(end-start)/86400+1;
+            Print("Progress ",T(date)," | days=",processed,"/",requested,
+                  " (",DoubleToString(100.0*processed/requested,1),"%) | ",day.status);
+            FileFlush(daily);
+           }
         }
       else if((int)((date-warm)/86400)%ProgressEveryDays==0) Print("Context warmup: ",T(date));
       // Current day's OHLC is appended ONLY AFTER measuring today's setup/context.
