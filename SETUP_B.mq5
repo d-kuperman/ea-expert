@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.09"
+#property version   "1.10"
 #property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
@@ -24,7 +24,9 @@ input bool     InpAutoBreakeven  = false;           // Activar BE automático (t
 input double   InpBreakevenPips  = 10.0;            // Activación en pips
 
 input group "--- Ejecución ---"
-input double   InpLots          = 0.01;            // Volumen de cada orden en lotes
+input double   InpRiskPercent   = 1.0;             // Riesgo base (% del balance por orden)
+input bool     InpVariableRisk  = false;           // Activar riesgo variable
+input double   InpRiskMultiplier = 1.10;           // Multiplicador del riesgo después de cada SL
 input ulong    InpMagicNumber   = 26100702;         // Identificador exclusivo de este EA
 
 //--- RANGO_A ---
@@ -79,6 +81,21 @@ bool g_setup_orders_processed = false;
 datetime g_last_be_error = 0;
 datetime g_last_oco_check = 0;
 datetime g_last_oco_error = 0;
+bool g_risk_dirty = true;
+double g_risk_percent = 0.0;
+double g_pending_risk_percent = -1.0;
+datetime g_last_risk_check = 0;
+
+// Se agrupan ejecuciones parciales: una posición cerrada cuenta una sola vez.
+struct RiskPosition
+{
+   ulong id;
+   double volume;
+   double entry_price;
+   double net_profit;
+   bool is_buy;
+   bool losing_stop;
+};
 
 // Detección de entorno y control de gráficos
 bool g_is_tester       = false;
@@ -674,6 +691,151 @@ bool TradingAllowed()
           AccountInfoInteger(ACCOUNT_TRADE_EXPERT);
 }
 
+// Conserva el día del setup cuando una pendiente se reemplaza en otro día.
+datetime SetupOrderDay(string comment, datetime created)
+{
+   if(StringFind(comment, "SETUP B ") == 0 && StringLen(comment) >= 18)
+   {
+      datetime day = StringToTime(StringSubstr(comment, 8, 10));
+      if(day > 0) return GetDayStart(day);
+   }
+   return GetDayStart(created);
+}
+
+void ApplyRiskClose(double net_profit, bool losing_stop, int &stops)
+{
+   if(net_profit > 0.0000001) stops = 0;
+   else if(net_profit < -0.0000001 && losing_stop) stops++;
+}
+
+// Reconstrucción determinista: reinicios y notificaciones repetidas no duplican SL.
+// Sólo se consulta al cambiar el historial o antes de enviar un nuevo setup.
+bool RefreshRisk()
+{
+   if(!InpVariableRisk)
+   {
+      g_risk_percent = InpRiskPercent;
+      g_risk_dirty = false;
+      return true;
+   }
+   if(!g_risk_dirty) return true;
+   if(!HistorySelect(0, TimeCurrent())) return false;
+   RiskPosition positions[];
+   int stops = 0;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+   {
+      ulong deal = HistoryDealGetTicket(i);
+      if(deal == 0 || HistoryDealGetString(deal, DEAL_SYMBOL) != _Symbol) continue;
+      ENUM_DEAL_TYPE type = (ENUM_DEAL_TYPE)HistoryDealGetInteger(deal, DEAL_TYPE);
+      if(type != DEAL_TYPE_BUY && type != DEAL_TYPE_SELL) continue;
+      ulong id = (ulong)HistoryDealGetInteger(deal, DEAL_POSITION_ID);
+      if(id == 0) continue;
+      ENUM_DEAL_ENTRY entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
+      int p = -1;
+      for(int j = 0; j < ArraySize(positions); j++)
+         if(positions[j].id == id) { p = j; break; }
+      if(p < 0)
+      {
+         if(entry != DEAL_ENTRY_IN ||
+            (ulong)HistoryDealGetInteger(deal, DEAL_MAGIC) != InpMagicNumber) continue;
+         p = ArraySize(positions);
+         if(ArrayResize(positions, p + 1) != p + 1) return false;
+         ZeroMemory(positions[p]);
+         positions[p].id = id;
+      }
+      double volume = HistoryDealGetDouble(deal, DEAL_VOLUME);
+      double price = HistoryDealGetDouble(deal, DEAL_PRICE);
+      double profit = HistoryDealGetDouble(deal, DEAL_PROFIT);
+      double costs = HistoryDealGetDouble(deal, DEAL_COMMISSION) +
+                     HistoryDealGetDouble(deal, DEAL_SWAP) + HistoryDealGetDouble(deal, DEAL_FEE);
+      if(entry == DEAL_ENTRY_IN)
+      {
+         double total = positions[p].volume + volume;
+         if(total <= 0.0) continue;
+         positions[p].entry_price = (positions[p].entry_price * positions[p].volume + price * volume) / total;
+         positions[p].volume = total;
+         positions[p].is_buy = (type == DEAL_TYPE_BUY);
+         positions[p].net_profit += profit + costs;
+         continue;
+      }
+      if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_OUT_BY && entry != DEAL_ENTRY_INOUT) continue;
+      if(positions[p].volume <= 0.00000001) continue;
+      double sl = HistoryDealGetDouble(deal, DEAL_SL);
+      bool adverse_sl = sl <= 0.0 || (positions[p].is_buy ?
+                        sl < positions[p].entry_price - _Point * 0.1 :
+                        sl > positions[p].entry_price + _Point * 0.1);
+      if((ENUM_DEAL_REASON)HistoryDealGetInteger(deal, DEAL_REASON) == DEAL_REASON_SL &&
+         profit < 0.0 && adverse_sl) positions[p].losing_stop = true;
+      // En una reversión, repartir la comisión proporcionalmente entre cierre y apertura.
+      double remaining = positions[p].volume - volume;
+      double close_costs = (entry == DEAL_ENTRY_INOUT && volume > positions[p].volume) ?
+                           costs * positions[p].volume / volume : costs;
+      positions[p].net_profit += profit + close_costs;
+      positions[p].volume = MathMax(0.0, remaining);
+      if(positions[p].volume <= 0.00000001)
+      {
+         ApplyRiskClose(positions[p].net_profit, positions[p].losing_stop, stops);
+         positions[p].volume = 0.0;
+         positions[p].net_profit = 0.0;
+         positions[p].losing_stop = false;
+         if(entry == DEAL_ENTRY_INOUT && remaining < -0.00000001)
+         {
+            positions[p].volume = -remaining;
+            positions[p].entry_price = price;
+            positions[p].is_buy = (type == DEAL_TYPE_BUY);
+            positions[p].net_profit = costs - close_costs;
+         }
+      }
+   }
+   double risk = InpRiskPercent * MathPow(InpRiskMultiplier, stops);
+   if(!MathIsValidNumber(risk) || risk <= 0.0)
+   {
+      Print("[SETUP B] Riesgo fuera del rango numérico. No se enviarán nuevas órdenes.");
+      return false;
+   }
+   if(risk != g_risk_percent)
+      PrintFormat("[SETUP B] Riesgo por orden: %.8f%% del balance (%d SL desde la última ganancia).", risk, stops);
+   g_risk_percent = risk;
+   g_risk_dirty = false;
+   return true;
+}
+
+double RiskVolume(double risk_money, double loss_per_lot, double minimum, double maximum, double step)
+{
+   if(!MathIsValidNumber(risk_money) || risk_money <= 0.0 ||
+      !MathIsValidNumber(loss_per_lot) || loss_per_lot <= 0.0 ||
+      minimum <= 0.0 || maximum < minimum || step <= 0.0) return 0.0;
+   double raw = risk_money / loss_per_lot;
+   if(!MathIsValidNumber(raw) || raw < minimum - step * 0.0000001 ||
+      raw > maximum + step * 0.0000001) return 0.0;
+   // Redondear sólo los lotes, hacia abajo; nunca el porcentaje acumulado.
+   double lots = NormalizeDouble(MathFloor(raw / step + 0.0000001) * step, 8);
+   if(lots < minimum || lots > maximum) return 0.0;
+   return lots;
+}
+
+bool CalculateRiskVolume(ENUM_ORDER_TYPE type, double price, double sl, double &volume)
+{
+   double minimum = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maximum = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   double loss = 0.0;
+   ENUM_ORDER_TYPE market_type = type == ORDER_TYPE_BUY_STOP ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   if(minimum <= 0.0 || !OrderCalcProfit(market_type, _Symbol, minimum, price, sl, loss) || loss >= 0.0)
+   {
+      Print("[SETUP B] No se pudo calcular la pérdida al SL en moneda de la cuenta.");
+      return false;
+   }
+   double money = AccountInfoDouble(ACCOUNT_BALANCE) * g_risk_percent / 100.0;
+   volume = RiskVolume(money, -loss / minimum, minimum, maximum, step);
+   if(volume <= 0.0)
+   {
+      PrintFormat("[SETUP B] Orden omitida: riesgo %.8f%% incompatible con los límites de volumen del símbolo.", g_risk_percent);
+      return false;
+   }
+   return true;
+}
+
 // Busca también órdenes ejecutadas, canceladas o expiradas: nunca reponerlas
 // al reiniciar el EA o cambiar sus parámetros durante el mismo día.
 bool SetupOrderAlreadyExists(ENUM_ORDER_TYPE type, datetime day_start)
@@ -684,7 +846,7 @@ bool SetupOrderAlreadyExists(ENUM_ORDER_TYPE type, datetime day_start)
       if(OrderGetString(ORDER_SYMBOL) == _Symbol &&
          (ulong)OrderGetInteger(ORDER_MAGIC) == InpMagicNumber &&
          (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE) == type &&
-         (datetime)OrderGetInteger(ORDER_TIME_SETUP) >= day_start)
+         SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP)) == day_start)
          return true;
    }
    for(int i = HistoryOrdersTotal() - 1; i >= 0; i--)
@@ -694,7 +856,7 @@ bool SetupOrderAlreadyExists(ENUM_ORDER_TYPE type, datetime day_start)
       if(HistoryOrderGetString(ticket, ORDER_SYMBOL) == _Symbol &&
          (ulong)HistoryOrderGetInteger(ticket, ORDER_MAGIC) == InpMagicNumber &&
          (ENUM_ORDER_TYPE)HistoryOrderGetInteger(ticket, ORDER_TYPE) == type &&
-         (datetime)HistoryOrderGetInteger(ticket, ORDER_TIME_SETUP) >= day_start &&
+         SetupOrderDay(HistoryOrderGetString(ticket, ORDER_COMMENT), (datetime)HistoryOrderGetInteger(ticket, ORDER_TIME_SETUP)) == day_start &&
          (ENUM_ORDER_STATE)HistoryOrderGetInteger(ticket, ORDER_STATE) != ORDER_STATE_REJECTED)
          return true;
    }
@@ -713,11 +875,11 @@ bool PlaceSetupStop(ENUM_ORDER_TYPE type, double entry)
    request.action = TRADE_ACTION_PENDING;
    request.symbol = _Symbol;
    request.magic = InpMagicNumber;
-   request.volume = InpLots;
    request.type = type;
    request.price = RoundTradePrice(entry);
    request.sl = RoundTradePrice(entry - direction * distance);
    request.tp = RoundTradePrice(entry + direction * distance * InpRiskReward);
+   if(!CalculateRiskVolume(type, request.price, request.sl, request.volume)) return false;
    request.type_filling = ORDER_FILLING_RETURN;
    request.type_time = ORDER_TIME_GTC;
    request.comment = "SETUP B " + TimeToString(g_current_day, TIME_DATE) + (is_buy ? " BUY" : " SELL");
@@ -752,9 +914,9 @@ bool PlaceSetupStop(ENUM_ORDER_TYPE type, double entry)
       PrintFormat("[SETUP B] Error enviando %s: %u, %s (error %d)", side, result.retcode, result.comment, GetLastError());
       return false;
    }
-   PrintFormat("[SETUP B] %s #%I64u: entrada=%s SL=%s TP=%s", side, result.order,
+   PrintFormat("[SETUP B] %s #%I64u: entrada=%s SL=%s TP=%s, lotes=%.8f, riesgo=%.8f%%", side, result.order,
                DoubleToString(request.price, _Digits), DoubleToString(request.sl, _Digits),
-               DoubleToString(request.tp, _Digits));
+               DoubleToString(request.tp, _Digits), request.volume, g_risk_percent);
    return true;
 }
 
@@ -771,12 +933,12 @@ bool GetExecutedSetup(ulong deal, datetime &setup_day, ENUM_ORDER_TYPE &side)
    if(HistoryOrderSelect(order))
    {
       side = (ENUM_ORDER_TYPE)HistoryOrderGetInteger(order, ORDER_TYPE);
-      setup_day = GetDayStart((datetime)HistoryOrderGetInteger(order, ORDER_TIME_SETUP));
+      setup_day = SetupOrderDay(HistoryOrderGetString(order, ORDER_COMMENT), (datetime)HistoryOrderGetInteger(order, ORDER_TIME_SETUP));
    }
    else if(OrderSelect(order)) // También cancelar ante una ejecución parcial.
    {
       side = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
-      setup_day = GetDayStart((datetime)OrderGetInteger(ORDER_TIME_SETUP));
+      setup_day = SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP));
    }
    else return false; // El historial puede llegar después del evento; reintentar.
    return side == ORDER_TYPE_BUY_STOP || side == ORDER_TYPE_SELL_STOP;
@@ -792,7 +954,7 @@ void CancelOppositeSetupOrder(datetime setup_day, ENUM_ORDER_TYPE executed_side)
       if(ticket == 0 || OrderGetString(ORDER_SYMBOL) != _Symbol ||
          (ulong)OrderGetInteger(ORDER_MAGIC) != InpMagicNumber ||
          (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE) != opposite ||
-         GetDayStart((datetime)OrderGetInteger(ORDER_TIME_SETUP)) != setup_day)
+         SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP)) != setup_day)
          continue;
       MqlTradeRequest request = {};
       MqlTradeResult result = {};
@@ -876,7 +1038,7 @@ void ReconcileSetupOCO()
          (ulong)OrderGetInteger(ORDER_MAGIC) != InpMagicNumber) continue;
       ENUM_ORDER_TYPE side = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
       if(side != ORDER_TYPE_BUY_STOP && side != ORDER_TYPE_SELL_STOP) continue;
-      datetime day = GetDayStart((datetime)OrderGetInteger(ORDER_TIME_SETUP));
+      datetime day = SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP));
       if(day < first_day) first_day = day;
       has_pending = true;
    }
@@ -890,10 +1052,86 @@ void ReconcileSetupOCO()
    }
 }
 
+// MT5 no permite modificar el volumen de una pendiente. Validar el reemplazo,
+// cancelar y enviarlo sólo tras confirmar que la original no llegó a ejecutarse.
+void ReconcilePendingRisk()
+{
+   if(!TradingAllowed() || g_last_risk_check == TimeCurrent()) return;
+   g_last_risk_check = TimeCurrent();
+   if(!RefreshRisk() || g_pending_risk_percent == g_risk_percent) return;
+   bool complete = true;
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = OrderGetTicket(i);
+      if(ticket == 0 || OrderGetString(ORDER_SYMBOL) != _Symbol ||
+         (ulong)OrderGetInteger(ORDER_MAGIC) != InpMagicNumber) continue;
+      ENUM_ORDER_TYPE type = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+      if(type != ORDER_TYPE_BUY_STOP && type != ORDER_TYPE_SELL_STOP) continue;
+      // No aumentar el remanente de una entrada que ya se ejecutó parcialmente.
+      if(OrderGetDouble(ORDER_VOLUME_CURRENT) != OrderGetDouble(ORDER_VOLUME_INITIAL)) continue;
+      MqlTradeRequest replacement = {};
+      replacement.action = TRADE_ACTION_PENDING;
+      replacement.symbol = _Symbol;
+      replacement.magic = InpMagicNumber;
+      replacement.type = type;
+      replacement.price = OrderGetDouble(ORDER_PRICE_OPEN);
+      replacement.sl = OrderGetDouble(ORDER_SL);
+      replacement.tp = OrderGetDouble(ORDER_TP);
+      replacement.type_time = (ENUM_ORDER_TYPE_TIME)OrderGetInteger(ORDER_TYPE_TIME);
+      replacement.expiration = (datetime)OrderGetInteger(ORDER_TIME_EXPIRATION);
+      replacement.type_filling = ORDER_FILLING_RETURN;
+      datetime day = SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP));
+      replacement.comment = "SETUP B " + TimeToString(day, TIME_DATE) + (type == ORDER_TYPE_BUY_STOP ? " BUY" : " SELL");
+      double previous_volume = OrderGetDouble(ORDER_VOLUME_CURRENT);
+      // Consultar OCO también aquí evita recrear una pendiente cuyo TP acaba de llegar.
+      if(!HistorySelect(day, TimeCurrent())) { complete = false; continue; }
+      if(SetupHasCancellation(day)) { complete = false; continue; }
+      if(replacement.sl <= 0.0 || !CalculateRiskVolume(type, replacement.price, replacement.sl, replacement.volume))
+      { complete = false; continue; }
+      if(MathAbs(replacement.volume - previous_volume) < 0.00000001) continue;
+      MqlTradeCheckResult check = {};
+      if(!OrderCheck(replacement, check))
+      {
+         PrintFormat("[SETUP B] Pendiente #%I64u conserva su volumen: reemplazo rechazado (%u, %s).", ticket, check.retcode, check.comment);
+         complete = false;
+         continue;
+      }
+      MqlTradeRequest removal = {};
+      MqlTradeResult removed = {};
+      removal.action = TRADE_ACTION_REMOVE;
+      removal.order = ticket;
+      removal.symbol = _Symbol;
+      removal.magic = InpMagicNumber;
+      if(!OrderSend(removal, removed) || removed.retcode != TRADE_RETCODE_DONE)
+      { complete = false; continue; }
+      if(!HistoryOrderSelect(ticket) ||
+         (ENUM_ORDER_STATE)HistoryOrderGetInteger(ticket, ORDER_STATE) != ORDER_STATE_CANCELED ||
+         MathAbs(HistoryOrderGetDouble(ticket, ORDER_VOLUME_CURRENT) - previous_volume) > 0.00000001)
+      {
+         PrintFormat("[SETUP B] No se repone #%I64u: no se confirmó cancelación íntegra sin ejecuciones.", ticket);
+         continue;
+      }
+      if(!HistorySelect(day, TimeCurrent()) || SetupHasCancellation(day)) continue;
+      MqlTradeResult placed = {};
+      if(!OrderSend(replacement, placed) ||
+         (placed.retcode != TRADE_RETCODE_DONE && placed.retcode != TRADE_RETCODE_PLACED))
+         PrintFormat("[SETUP B] ATENCIÓN: #%I64u cancelada pero reemplazo rechazado (%u, %s). No se reenvía para evitar duplicados.", ticket, placed.retcode, placed.comment);
+      else
+         PrintFormat("[SETUP B] Riesgo actualizado: #%I64u reemplazada por #%I64u; %.8f lotes, %.8f%%.", ticket, placed.order, replacement.volume, g_risk_percent);
+   }
+   if(complete) g_pending_risk_percent = g_risk_percent;
+}
+
 void OnTradeTransaction(const MqlTradeTransaction &trans,
                         const MqlTradeRequest &request,
                         const MqlTradeResult &result)
 {
+   if(trans.type == TRADE_TRANSACTION_DEAL_ADD || trans.type == TRADE_TRANSACTION_DEAL_UPDATE ||
+      trans.type == TRADE_TRANSACTION_DEAL_DELETE)
+   {
+      g_risk_dirty = true;
+      g_last_risk_check = 0;
+   }
    if(trans.type != TRADE_TRANSACTION_DEAL_ADD || trans.symbol != _Symbol) return;
    if(!HistoryDealSelect(trans.deal)) return;
    // DEAL_ADD puede anunciar el cierre de una posición cuyo setup sea antiguo.
@@ -917,6 +1155,8 @@ void PlaceSetupOrders()
    if(!g_setup_evaluated_today || !g_setup_b_today || g_setup_orders_processed ||
       g_current_day != GetDayStart(TimeCurrent()) || !TradingAllowed())
       return;
+   g_risk_dirty = true;
+   if(!RefreshRisk()) return;
    // Si la historia aún no está disponible, esperar antes de arriesgar duplicados.
    if(!HistorySelect(g_current_day, TimeCurrent())) return;
    bool has_buy = SetupOrderAlreadyExists(ORDER_TYPE_BUY_STOP, g_current_day);
@@ -999,20 +1239,17 @@ int OnInit()
    if(!MathIsValidNumber(InpStopLossPips) || InpStopLossPips <= 0.0 ||
       !MathIsValidNumber(InpRiskReward) || InpRiskReward <= 0.0 ||
       (InpAutoBreakeven && (!MathIsValidNumber(InpBreakevenPips) || InpBreakevenPips <= 0.0)) ||
-      !MathIsValidNumber(InpLots) || InpLots <= 0.0 || InpMagicNumber == 0)
+      !MathIsValidNumber(InpRiskPercent) || InpRiskPercent <= 0.0 ||
+      (InpVariableRisk && (!MathIsValidNumber(InpRiskMultiplier) || InpRiskMultiplier <= 0.0)) ||
+      InpMagicNumber == 0)
    {
-      Print("[SETUP B] SL, RR, lotes y Magic deben ser positivos; activación BE también si está habilitado.");
+      Print("[SETUP B] SL, RR, riesgo base y Magic deben ser positivos; multiplicador y activación BE también si están habilitados.");
       return INIT_PARAMETERS_INCORRECT;
    }
-   double volume_min = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
-   double volume_max = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
-   double volume_step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
-   if(volume_step <= 0.0 || InpLots < volume_min || InpLots > volume_max ||
-      MathAbs(InpLots / volume_step - MathRound(InpLots / volume_step)) > 0.0000001)
-   {
-      PrintFormat("[SETUP B] Lotes inválidos: mínimo=%g, máximo=%g, paso=%g", volume_min, volume_max, volume_step);
-      return INIT_PARAMETERS_INCORRECT;
-   }
+   g_risk_dirty = true;
+   g_risk_percent = InpRiskPercent;
+   g_pending_risk_percent = -1.0;
+   g_last_risk_check = 0;
 
    // Parsear horarios configurados
    int h_sa, m_sa, h_ea, m_ea;
@@ -1077,6 +1314,7 @@ void OnDeinit(const int reason)
 void OnTick()
 {
    ReconcileSetupOCO();
+   ReconcilePendingRisk();
    // Gestionar posiciones aun si la historia de rangos todavía no está lista.
    ManageBreakeven();
    // CopyRates puede no estar listo durante OnInit; esperar el historial de rangos.
