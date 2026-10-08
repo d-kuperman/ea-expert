@@ -1,0 +1,273 @@
+CANDIDATES
+InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+        true                false             20.0            3.0             true               5.0    125.0    16942.0    22349.0          9.9783          8.8853          1.398335          2.169737            1.671138            2.204913         4.459855         7.426368       75.0       53.0
+        true                false             15.0            4.0             true               5.0    137.0    12900.0    16739.0          8.2677          8.4123          1.317938          1.889663            1.535714            1.737132         3.892566         5.976900       76.0       54.0
+        true                false             20.0            4.0             true               5.0    141.0    19358.0    35378.0         13.5413          8.5836          1.443442          2.851670            1.407036            3.490331         3.167969         8.252691       75.0       53.0
+        true                false             20.0            3.0             true              10.0    285.0    12827.0    43613.0         19.7589          7.4460          1.198293          3.024181            0.638954            4.349122         2.376534        12.972377       74.0       51.0
+       false                false             15.0            4.0             true              10.0    296.0    16954.0    21057.0         11.2098         12.6352          1.395752          1.805208            1.398845            1.309026         5.215049         5.733014       72.0       48.0
+        true                false             20.0            3.0             true              15.0    445.0    20503.0    48513.0         18.0817         10.0542          1.297347          2.209348            1.116052            3.438687         3.238986         8.394975       73.0       49.0
+        true                false             15.0            4.0             true              15.0    457.0    18676.0    48393.0         16.0802          8.1209          1.288299          2.409477            1.134629            4.101797         3.745856         8.862480       74.0       50.0
+        true                false             20.0            4.0             true              15.0    461.0    14563.0    58617.0         19.5333         10.7900          1.201361          2.362584            0.710945            4.149582         1.621206         6.257588       74.0       51.0
+        true                false             15.0            5.0             true              15.0    473.0     6500.0    58519.0         19.2259          9.1434          1.096097          2.609256            0.321178            4.335062         0.932668         7.512699       75.0       51.0
+
+CANDIDATES ALL VERSIONS
+ Pass_25 InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_F  Pass_V  Profit_25  Profit_26  Profit_F  Profit_V  Equity DD %_F  Equity DD %_V  Profit Factor_F  Profit Factor_V  Recovery Factor_F  Recovery Factor_V  Trades_F  Trades_V
+   125.0         true                false             20.0            3.0             true               5.0    61.0   349.0    16942.0    22349.0  11508.44  13211.45         4.8310         4.9704         2.140818         2.273074           2.224464           2.473911      53.0      53.0
+   137.0         true                false             15.0            4.0             true               5.0    73.0   361.0    12900.0    16739.0  11328.96  14228.85         6.0291         6.2513         1.837991         1.994511           1.710899           2.062750      54.0      54.0
+   141.0         true                false             20.0            4.0             true               5.0    77.0   365.0    19358.0    35378.0  18862.93  20669.11         4.8028         5.1483         2.824783         2.918393           3.597812           3.656231      53.0      53.0
+   285.0         true                false             20.0            3.0             true              10.0   157.0   445.0    12827.0    43613.0  23511.63  25910.03         4.8945         5.3155         2.910195         2.995067           4.055897           4.073757      51.0      51.0
+   296.0        false                false             15.0            4.0             true              10.0   168.0   456.0    16954.0    21057.0  14327.44  17883.30        10.2020        12.6858         1.750323         1.781756           1.176397           1.152369      48.0      48.0
+   445.0         true                false             20.0            3.0             true              15.0   253.0   541.0    20503.0    48513.0  26036.24  32920.17         6.8727         8.7318         2.114085         2.234795           3.119110           3.010441      49.0      49.0
+   457.0         true                false             15.0            4.0             true              15.0   265.0   553.0    18676.0    48393.0  35771.49  47586.74         7.6210         9.4820         2.247109         2.427459           3.513219           3.606709      50.0      50.0
+   461.0         true                false             20.0            4.0             true              15.0   269.0   557.0    14563.0    58617.0  32105.85  41208.79         6.8749         8.7334         2.285534         2.433361           3.833287           3.747419      51.0      51.0
+   473.0         true                false             15.0            5.0             true              15.0   281.0   569.0     6500.0    58519.0  44201.84  60068.89         8.5506        10.0510         2.413612         2.577101           3.823351           4.265014      51.0      51.0
+
+ANNUAL WINNERS
+F25 [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 20.0, 'InpRiskReward': 3.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 15.0, 'Result': 43.04, 'Profit': 20503.0, 'Expected Payoff': 280.863014, 'Profit Factor': 1.297347, 'Recovery Factor': 1.116052, 'Sharpe Ratio': 3.238986, 'Custom': 0.0, 'Equity DD %': 18.0817, 'Trades': 73.0, 'Pass': 445.0}]
+old years: InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+        true                false             20.0            3.0             true              15.0    445.0    20503.0    48513.0         18.0817         10.0542          1.297347          2.209348            1.116052            3.438687         3.238986         8.394975       73.0       49.0
+F26 [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 20.0, 'InpRiskReward': 4.0, 'InpAutoBreakeven': 'false', 'InpBreakevenPips': 0.0, 'Result': 67.44, 'Profit': 66638.0, 'Expected Payoff': 1388.291667, 'Profit Factor': 2.022275, 'Recovery Factor': 2.99847, 'Sharpe Ratio': 4.900527, 'Custom': 0.0, 'Equity DD %': 14.9344, 'Trades': 48.0, 'Pass': 61.0}]
+old years: InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+        true                false             20.0            4.0            false               0.0     61.0    -3484.0    66638.0         28.1807         14.9344           0.97129          2.022275           -0.121313             2.99847        -0.239682         4.900527       71.0       48.0
+new_fixed [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 15.0, 'InpRiskReward': 5.0, 'InpAutoBreakeven': 'false', 'InpBreakevenPips': 0.0, 'Result': 71.17, 'Profit': 47651.72, 'Expected Payoff': 972.484082, 'Profit Factor': 2.028861, 'Recovery Factor': 3.104579, 'Sharpe Ratio': 5.515782, 'Custom': 0.0, 'Equity DD %': 11.0013, 'Trades': 49.0, 'Pass': 41.0}]
+old years: InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+        true                false             15.0            5.0            false               0.0     73.0    -2156.0    62062.0         20.4838         11.3234          0.977985          2.143515           -0.103281            3.590304         -0.21202         5.816214       73.0       49.0
+variable [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 15.0, 'InpRiskReward': 5.0, 'InpAutoBreakeven': 'false', 'InpBreakevenPips': 0.0, 'Result': 68.62, 'Profit': 77369.99, 'Expected Payoff': 1578.979388, 'Profit Factor': 2.191777, 'Recovery Factor': 3.062975, 'Sharpe Ratio': 5.676085, 'Custom': 0.0, 'Equity DD %': 16.278, 'Trades': 49.0, 'Pass': 329.0}]
+old years: InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+        true                false             15.0            5.0            false               0.0     73.0    -2156.0    62062.0         20.4838         11.3234          0.977985          2.143515           -0.103281            3.590304         -0.21202         5.816214       73.0       49.0
+
+MARGINAL ON ORIGINAL FULL FACTORIAL RAW ROWS (BE duplicated equally)
+InpUseRangeA
+                n  positive    profit      dd  positive_26  profit_26  dd_26
+InpUseRangeA                                                                
+false         240    19.167 -4344.646  14.173        88.75   8387.483  9.610
+true          240     8.333 -9862.038  17.535        86.25  12997.300  8.809
+InpCancelSecondEntry
+                        n  positive    profit      dd  positive_26  profit_26   dd_26
+InpCancelSecondEntry                                                                 
+false                 240    24.167 -5055.929  16.283       86.667  12748.296  10.286
+true                  240     3.333 -9150.754  15.426       88.333   8636.488   8.133
+InpStopLossPips
+                   n  positive    profit      dd  positive_26  profit_26   dd_26
+InpStopLossPips                                                                 
+5.0              120     1.667 -4424.483   8.969       85.833   3433.133   4.005
+10.0             120     8.333 -9086.792  14.999       85.833   7256.900   8.219
+15.0             120    22.500 -8373.475  18.622       93.333  16204.467  10.018
+20.0             120    22.500 -6528.617  20.826       85.000  15875.067  14.596
+InpRiskReward
+                n  positive     profit      dd  positive_26  profit_26   dd_26
+InpRiskReward                                                                 
+1.0            96    13.542  -7444.365  12.906       77.083   4147.427   5.935
+2.0            96     1.042 -10847.229  16.381       88.542   6972.917   8.013
+3.0            96    13.542  -8151.948  16.995       91.667  12512.958   8.975
+4.0            96    21.875  -4312.646  16.130       88.542  13855.969  10.893
+5.0            96    18.750  -4760.521  16.860       91.667  15972.688  12.232
+InpAutoBreakeven
+                    n  positive    profit      dd  positive_26  profit_26   dd_26
+InpAutoBreakeven                                                                 
+false             240      8.75 -9306.150  17.747        88.75  12064.138  10.650
+true              240     18.75 -4900.533  13.961        86.25   9320.646   7.769
+InpBreakevenPips
+                    n  positive    profit      dd  positive_26  profit_26  dd_26
+InpBreakevenPips                                                                
+5.0               160    14.375 -7085.512  15.410       82.500   8699.456  8.651
+10.0              160    13.750 -7045.844  15.816       93.125  12051.225  9.015
+15.0              160    13.125 -7178.669  16.337       86.875  11326.494  9.963
+
+BE ACTIVE THRESHOLD
+F25                    n    profit  positive
+InpBreakevenPips                        
+5.0               80 -4864.875     20.00
+10.0              80 -4785.538     18.75
+15.0              80 -5051.188     17.50
+F26                    n     profit  positive
+InpBreakevenPips                         
+5.0               80   5334.775     76.25
+10.0              80  12038.312     97.50
+15.0              80  10588.850     85.00
+
+BINARY MATCHED EFFECTS
+InpUseRangeA F25 n 240 true improves 64 mean delta -5517.39
+InpUseRangeA F26 n 240 true improves 137 mean delta 4609.82
+InpCancelSecondEntry F25 n 240 true improves 79 mean delta -4094.82
+InpCancelSecondEntry F26 n 240 true improves 110 mean delta -4111.81
+InpAutoBreakeven F25 n 240 true improves 147 mean delta 4405.62
+InpAutoBreakeven F26 n 240 true improves 80 mean delta -2743.49
+
+FAMILY A NO EARLY CANCEL BE ON
+family n/both 60 20
+ InpStopLossPips  InpRiskReward  InpBreakevenPips  Profit_25  Profit_26  max_period_DD
+             5.0            1.0               5.0    -3000.0     2460.0         5.7579
+            10.0            1.0               5.0   -15088.0     9430.0        16.8869
+            15.0            1.0               5.0   -11477.0     5925.0        15.5019
+            20.0            1.0               5.0   -10164.0     8947.0        18.4006
+             5.0            2.0               5.0    -6310.0     5370.0         8.2827
+            10.0            2.0               5.0   -11518.0     6086.0        14.5079
+            15.0            2.0               5.0    -7266.0    13032.0        13.3730
+            20.0            2.0               5.0     1616.0    13997.0        14.5915
+             5.0            3.0               5.0    -4560.0     -888.0         9.4415
+            10.0            3.0               5.0    -8448.0    10631.0        10.4823
+            15.0            3.0               5.0      186.0    13867.0        11.2008
+            20.0            3.0               5.0    16942.0    22349.0         9.9783
+             5.0            4.0               5.0     -680.0     -306.0         8.7402
+            10.0            4.0               5.0    -2628.0     1986.0        11.5551
+            15.0            4.0               5.0    12900.0    16739.0         8.4123
+            20.0            4.0               5.0    19358.0    35378.0        13.5413
+             5.0            5.0               5.0    -2820.0     2629.0         7.0768
+            10.0            5.0               5.0     1444.0     7006.0         9.5571
+            15.0            5.0               5.0    10050.0    24828.0        13.4705
+            20.0            5.0               5.0     4855.0    38699.0        23.4159
+             5.0            1.0              10.0    -3000.0     2460.0         5.7579
+            10.0            1.0              10.0   -18478.0    15621.0        20.0921
+            15.0            1.0              10.0   -16755.0    10496.0        18.7616
+            20.0            1.0              10.0   -14191.0    12800.0        18.3406
+             5.0            2.0              10.0    -4620.0     9960.0         6.5085
+            10.0            2.0              10.0   -13737.0     8899.0        16.1506
+            15.0            2.0              10.0   -12693.0    17335.0        15.5207
+            20.0            2.0              10.0    -4479.0    21850.0        21.7274
+             5.0            3.0              10.0    -2420.0     5182.0         8.8026
+            10.0            3.0              10.0    -7877.0    16404.0        12.7451
+            15.0            3.0              10.0    -5931.0    22602.0        18.2963
+            20.0            3.0              10.0    12827.0    43613.0        19.7589
+             5.0            4.0              10.0     1061.0     1496.0         9.0640
+            10.0            4.0              10.0    -3727.0    10809.0        15.4616
+            15.0            4.0              10.0    11293.0    37503.0        16.8396
+            20.0            4.0              10.0     5075.0    54278.0        20.0935
+             5.0            5.0              10.0     -299.0     5431.0         7.5974
+            10.0            5.0              10.0     3305.0    18651.0        14.4085
+            15.0            5.0              10.0    -2245.0    51180.0        18.6407
+            20.0            5.0              10.0    -7844.0    42581.0        26.4557
+             5.0            1.0              15.0    -3000.0     2460.0         5.7579
+            10.0            1.0              15.0   -18478.0    15621.0        20.0921
+            15.0            1.0              15.0    -9183.0     1731.0        11.8795
+            20.0            1.0              15.0    -8346.0    -3085.0        12.5876
+             5.0            2.0              15.0    -4620.0     9960.0         6.5085
+            10.0            2.0              15.0   -10795.0     5242.0        13.2549
+            15.0            2.0              15.0    -8181.0    14340.0        14.4163
+            20.0            2.0              15.0     -763.0    23519.0        21.9596
+             5.0            3.0              15.0    -3920.0     3262.0        10.2226
+            10.0            3.0              15.0    -4925.0    17637.0        13.1762
+            15.0            3.0              15.0    -1588.0    32487.0        18.3937
+            20.0            3.0              15.0    20503.0    48513.0        18.0817
+             5.0            4.0              15.0       61.0       26.0        10.0482
+            10.0            4.0              15.0     1245.0    12636.0        14.4577
+            15.0            4.0              15.0    18676.0    48393.0        16.0802
+            20.0            4.0              15.0    14563.0    58617.0        19.5333
+             5.0            5.0              15.0     -739.0     4461.0         9.0837
+            10.0            5.0              15.0    10217.0    18072.0        12.4892
+            15.0            5.0              15.0     6500.0    58519.0        19.2259
+            20.0            5.0              15.0   -14780.0    52920.0        31.2254
+
+NEIGHBORS, ONE GRID STEP NUMERIC (no Boolean flips)
+125 n 4 both positive 4 worst25 186.0 median25 7221.5 mean25 8496.75 worst26 13867.0 neighbors [109.0, 121.0, 141.0, 285.0]
+137 n 5 both positive 4 worst25 -2628.0 median25 10050.0 mean25 7651.8 worst26 1986.0 neighbors [121.0, 133.0, 141.0, 153.0, 297.0]
+141 n 4 both positive 4 worst25 4855.0 median25 8987.5 mean25 9943.0 worst26 16739.0 neighbors [125.0, 137.0, 157.0, 301.0]
+445 n 4 both positive 2 worst25 -1588.0 median25 6032.0 mean25 6259.75 worst26 23519.0 neighbors [285.0, 429.0, 441.0, 461.0]
+457 n 5 both positive 4 worst25 -1588.0 median25 6500.0 mean25 6402.6 worst26 12636.0 neighbors [297.0, 441.0, 453.0, 461.0, 473.0]
+461 n 4 both positive 3 worst25 -14780.0 median25 11875.5 mean25 7368.5 worst26 48393.0 neighbors [301.0, 445.0, 457.0, 477.0]
+473 n 4 both positive 2 worst25 -14780.0 median25 3986.0 mean25 2967.0 worst26 18072.0 neighbors [313.0, 457.0, 469.0, 477.0]
+296 n 6 both positive 5 worst25 -6075.0 median25 7295.0 mean25 5333.833333333333 worst26 1574.0 neighbors [136.0, 280.0, 292.0, 300.0, 312.0, 456.0]
+285 n 5 both positive 3 worst25 -5931.0 median25 5075.0 mean25 6422.0 worst26 21850.0 neighbors [125.0, 269.0, 281.0, 301.0, 445.0]
+
+VARIABLE DIAGNOSTICS
+       Profit_delta  Equity DD %_delta  Profit Factor_delta  Recovery Factor_delta  Sharpe Ratio_delta  Trades_delta  Return_DD_delta
+count    192.000000         192.000000           192.000000             192.000000          192.000000    192.000000       192.000000
+mean    2742.812656           2.835865             0.050023               0.081435            0.543452     -0.145833         0.124208
+std     5570.487807           3.820513             0.107970               0.246620            1.423842      0.521359         0.294722
+min   -41331.750000          -0.939100            -0.334045              -0.757438           -3.509929     -3.000000        -0.889513
+25%     1113.987500           0.585475             0.002946              -0.048872           -0.066901      0.000000        -0.034299
+50%     2562.710000           1.536700             0.069016               0.066862            0.324844      0.000000         0.102459
+75%     4539.640000           3.783275             0.124967               0.209427            0.884331      0.000000         0.285873
+max    29718.270000          36.397100             0.218589               0.862966            5.525519      0.000000         0.975078
+dominate 5
+old-control same trade count 181
+DD threshold 5 fixed 176 variable 184
+DD threshold 10 fixed 77 variable 107
+DD threshold 15 fixed 10 variable 46
+DD threshold 20 fixed 2 variable 19
+DD threshold 30 fixed 0 variable 3
+DD threshold 40 fixed 0 variable 1
+DD threshold 50 fixed 0 variable 1
+worst variable [{'InpUseRangeA': 'false', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 10.0, 'InpRiskReward': 5.0, 'InpAutoBreakeven': 'false', 'InpBreakevenPips': 0.0, 'Result': 3.34, 'Profit': -48453.75, 'Expected Payoff': -1009.453125, 'Profit Factor': 0.517524, 'Recovery Factor': -0.614249, 'Sharpe Ratio': -5.0, 'Custom': 0.0, 'Equity DD %': 60.4795, 'Trades': 48.0}, {'InpUseRangeA': 'false', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 10.0, 'InpRiskReward': 5.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 15.0, 'Result': 3.52, 'Profit': -18486.09, 'Expected Payoff': -377.267143, 'Profit Factor': 0.679967, 'Recovery Factor': -0.42304, 'Sharpe Ratio': -2.881895, 'Custom': 0.0, 'Equity DD %': 34.8994, 'Trades': 49.0}, {'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'true', 'InpStopLossPips': 10.0, 'InpRiskReward': 4.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 5.0, 'Result': 2.52, 'Profit': -7725.4, 'Expected Payoff': -266.393103, 'Profit Factor': 0.341928, 'Recovery Factor': -0.680983, 'Sharpe Ratio': -5.0, 'Custom': 0.0, 'Equity DD %': 10.9934, 'Trades': 29.0}]
+
+PARETO WORST PROFIT MAX DD
+InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+       false                 true             10.0            1.0            false               0.0      6.0     1650.0     6308.0          5.2951          3.6847          1.075342          1.559269            0.295170            1.660000         2.917678        11.532162       40.0       28.0
+       false                 true             10.0            1.0             true              10.0    246.0     1650.0     6308.0          5.2951          3.6847          1.075342          1.559269            0.295170            1.660000         2.917678        11.532162       40.0       28.0
+       false                 true             10.0            1.0             true              15.0    406.0     1650.0     6308.0          5.2951          3.6847          1.075342          1.559269            0.295170            1.660000         2.917678        11.532162       40.0       28.0
+        true                false             15.0            4.0             true               5.0    137.0    12900.0    16739.0          8.2677          8.4123          1.317938          1.889663            1.535714            1.737132         3.892566         5.976900       76.0       54.0
+        true                false             20.0            3.0             true               5.0    125.0    16942.0    22349.0          9.9783          8.8853          1.398335          2.169737            1.671138            2.204913         4.459855         7.426368       75.0       53.0
+       false                false             15.0            4.0             true              10.0    296.0    16954.0    21057.0         11.2098         12.6352          1.395752          1.805208            1.398845            1.309026         5.215049         5.733014       72.0       48.0
+        true                false             20.0            4.0             true               5.0    141.0    19358.0    35378.0         13.5413          8.5836          1.443442          2.851670            1.407036            3.490331         3.167969         8.252691       75.0       53.0
+        true                false             20.0            3.0             true              15.0    445.0    20503.0    48513.0         18.0817         10.0542          1.297347          2.209348            1.116052            3.438687         3.238986         8.394975       73.0       49.0
+
+GRID CORE SL 15-20 RR 3-4, BE all
+InpUseRangeA InpCancelSecondEntry  InpStopLossPips  InpRiskReward InpAutoBreakeven  InpBreakevenPips  Pass_25  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26  Profit Factor_25  Profit Factor_26  Recovery Factor_25  Recovery Factor_26  Sharpe Ratio_25  Sharpe Ratio_26  Trades_25  Trades_26
+        true                false             15.0            3.0             true               5.0    121.0      186.0    13867.0         11.2008          5.5469          1.004600          1.807771            0.016344            2.128473         0.105593         6.843420       75.0       54.0
+        true                false             20.0            3.0             true               5.0    125.0    16942.0    22349.0          9.9783          8.8853          1.398335          2.169737            1.671138            2.204913         4.459855         7.426368       75.0       53.0
+        true                false             15.0            4.0             true               5.0    137.0    12900.0    16739.0          8.2677          8.4123          1.317938          1.889663            1.535714            1.737132         3.892566         5.976900       76.0       54.0
+        true                false             20.0            4.0             true               5.0    141.0    19358.0    35378.0         13.5413          8.5836          1.443442          2.851670            1.407036            3.490331         3.167969         8.252691       75.0       53.0
+        true                false             15.0            3.0             true              10.0    281.0    -5931.0    22602.0         18.2963          7.0652          0.901285          2.038934           -0.319060            2.566076        -2.171692         8.353125       74.0       52.0
+        true                false             20.0            3.0             true              10.0    285.0    12827.0    43613.0         19.7589          7.4460          1.198293          3.024181            0.638954            4.349122         2.376534        12.972377       74.0       51.0
+        true                false             15.0            4.0             true              10.0    297.0    11293.0    37503.0         16.8396          6.5173          1.187526          2.723880            0.660062            4.257834         2.591782        12.110006       75.0       52.0
+        true                false             20.0            4.0             true              10.0    301.0     5075.0    54278.0         20.0935          8.0631          1.076932          3.269147            0.248592            5.376189         0.633147         8.219079       75.0       52.0
+        true                false             15.0            3.0             true              15.0    441.0    -1588.0    32487.0         18.3937          9.0552          0.975434          1.960046           -0.084974            2.753602        -0.485668         7.806601       73.0       50.0
+        true                false             20.0            3.0             true              15.0    445.0    20503.0    48513.0         18.0817         10.0542          1.297347          2.209348            1.116052            3.438687         3.238986         8.394975       73.0       49.0
+        true                false             15.0            4.0             true              15.0    457.0    18676.0    48393.0         16.0802          8.1209          1.288299          2.409477            1.134629            4.101797         3.745856         8.862480       74.0       50.0
+        true                false             20.0            4.0             true              15.0    461.0    14563.0    58617.0         19.5333         10.7900          1.201361          2.362584            0.710945            4.149582         1.621206         6.257588       74.0       51.0
+
+RANK CHANGES & SELECTION
+10 overlap 3 top26 losses25 5 top25 losses26 0
+20 overlap 6 top26 losses25 11 top25 losses26 1
+32 overlap 9 top26 losses25 21 top25 losses26 3
+
+LOW DD RETURNS
+5 n 0 best total []
+8 n 4 best total [{'InpUseRangeA': 'false', 'InpCancelSecondEntry': 'true', 'InpStopLossPips': 10.0, 'InpRiskReward': 1.0, 'InpAutoBreakeven': 'false', 'InpBreakevenPips': 0.0, 'Pass_25': 6.0, 'Profit_25': 1650.0, 'Profit_26': 6308.0, 'Equity DD %_25': 5.2951, 'Equity DD %_26': 3.6847, 'Profit Factor_25': 1.075342, 'Profit Factor_26': 1.559269, 'Recovery Factor_25': 0.29517, 'Recovery Factor_26': 1.66, 'Sharpe Ratio_25': 2.917678, 'Sharpe Ratio_26': 11.532162, 'Trades_25': 40.0, 'Trades_26': 28.0}]
+10 n 11 best total [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 20.0, 'InpRiskReward': 3.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 5.0, 'Pass_25': 125.0, 'Profit_25': 16942.0, 'Profit_26': 22349.0, 'Equity DD %_25': 9.9783, 'Equity DD %_26': 8.8853, 'Profit Factor_25': 1.398335, 'Profit Factor_26': 2.169737, 'Recovery Factor_25': 1.671138, 'Recovery Factor_26': 2.204913, 'Sharpe Ratio_25': 4.459855, 'Sharpe Ratio_26': 7.426368, 'Trades_25': 75.0, 'Trades_26': 53.0}]
+15 n 29 best total [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 20.0, 'InpRiskReward': 4.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 5.0, 'Pass_25': 141.0, 'Profit_25': 19358.0, 'Profit_26': 35378.0, 'Equity DD %_25': 13.5413, 'Equity DD %_26': 8.5836, 'Profit Factor_25': 1.443442, 'Profit Factor_26': 2.85167, 'Recovery Factor_25': 1.407036, 'Recovery Factor_26': 3.490331, 'Sharpe Ratio_25': 3.167969, 'Sharpe Ratio_26': 8.252691, 'Trades_25': 75.0, 'Trades_26': 53.0}]
+20 n 41 best total [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 20.0, 'InpRiskReward': 4.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 15.0, 'Pass_25': 461.0, 'Profit_25': 14563.0, 'Profit_26': 58617.0, 'Equity DD %_25': 19.5333, 'Equity DD %_26': 10.79, 'Profit Factor_25': 1.201361, 'Profit Factor_26': 2.362584, 'Recovery Factor_25': 0.710945, 'Recovery Factor_26': 4.149582, 'Sharpe Ratio_25': 1.621206, 'Sharpe Ratio_26': 6.257588, 'Trades_25': 74.0, 'Trades_26': 51.0}]
+100 n 49 best total [{'InpUseRangeA': 'true', 'InpCancelSecondEntry': 'false', 'InpStopLossPips': 20.0, 'InpRiskReward': 4.0, 'InpAutoBreakeven': 'true', 'InpBreakevenPips': 15.0, 'Pass_25': 461.0, 'Profit_25': 14563.0, 'Profit_26': 58617.0, 'Equity DD %_25': 19.5333, 'Equity DD %_26': 10.79, 'Profit Factor_25': 1.201361, 'Profit Factor_26': 2.362584, 'Recovery Factor_25': 0.710945, 'Recovery Factor_26': 4.149582, 'Sharpe Ratio_25': 1.621206, 'Sharpe Ratio_26': 6.257588, 'Trades_25': 74.0, 'Trades_26': 51.0}]
+
+EXTRA AUDIT
+distinct metric vectors {'F25': 284, 'F26': 284, 'V26': 376}
+sums  Pass_25  sum_independent_profit  illustrative_compound_pct
+   125.0                 39291.0                  43.077368
+   137.0                 29639.0                  31.798331
+   141.0                 54736.0                  61.584473
+   285.0                 56440.0                  62.034240
+   296.0                 38011.0                  41.581004
+   445.0                 69016.0                  78.962620
+   457.0                 67069.0                  76.106877
+   461.0                 73180.0                  81.716394
+   473.0                 65019.0                  68.822735
+worst pair [{'Profit_F': -7122.0, 'Profit_V': -48453.75, 'Equity DD %_F': 24.0824, 'Equity DD %_V': 60.4795, 'Trades_F': 48.0, 'Trades_V': 48.0}]
+same trade counts 176 148
+cancel flip InpCancelSecondEntry  Profit_25  Profit_26  Equity DD %_25  Equity DD %_26
+               false    18676.0    48393.0         16.0802          8.1209
+                true   -11612.0    11560.0         19.6821         13.5691
+range flip InpUseRangeA  Profit_25  Profit_26
+       false     9855.0    11366.0
+        true    18676.0    48393.0
+BE flip InpAutoBreakeven  Profit_25  Profit_26
+           false   -12134.0    49132.0
+            true    18676.0    48393.0
+marginal unique F25
+InpUseRangeA {'false': {'n': 160, 'positive': 32, 'profit_mean': -3853.23125}, 'true': {'n': 160, 'positive': 20, 'profit_mean': -8150.64375}}
+InpCancelSecondEntry {'false': {'n': 160, 'positive': 46, 'profit_mean': -3405.94375}, 'true': {'n': 160, 'positive': 6, 'profit_mean': -8597.93125}}
+InpStopLossPips {5.0: {'n': 80, 'positive': 2, 'profit_mean': -4512.875}, 10.0: {'n': 80, 'positive': 8, 'profit_mean': -8273.0625}, 15.0: {'n': 80, 'positive': 21, 'profit_mean': -6578.8625}, 20.0: {'n': 80, 'positive': 21, 'profit_mean': -4642.95}}
+InpRiskReward {1.0: {'n': 64, 'positive': 9, 'profit_mean': -7273.015625}, 2.0: {'n': 64, 'positive': 1, 'profit_mean': -9427.8125}, 3.0: {'n': 64, 'positive': 11, 'profit_mean': -6064.296875}, 4.0: {'n': 64, 'positive': 17, 'profit_mean': -3025.03125}, 5.0: {'n': 64, 'positive': 14, 'profit_mean': -4219.53125}}
+InpAutoBreakeven {'false': {'n': 80, 'positive': 7, 'profit_mean': -9306.15}, 'true': {'n': 240, 'positive': 45, 'profit_mean': -4900.533333333334}}
+marginal unique F26
+InpUseRangeA {'false': {'n': 160, 'positive': 143, 'profit_mean': 8358.1625}, 'true': {'n': 160, 'positive': 135, 'profit_mean': 11654.875}}
+InpCancelSecondEntry {'false': {'n': 160, 'positive': 140, 'profit_mean': 12219.26875}, 'true': {'n': 160, 'positive': 138, 'profit_mean': 7793.76875}}
+InpStopLossPips {5.0: {'n': 80, 'positive': 67, 'profit_mean': 3254.7}, 10.0: {'n': 80, 'positive': 69, 'profit_mean': 6999.25}, 15.0: {'n': 80, 'positive': 74, 'profit_mean': 14844.85}, 20.0: {'n': 80, 'positive': 68, 'profit_mean': 14927.275}}
+InpRiskReward {1.0: {'n': 64, 'positive': 52, 'profit_mean': 4705.234375}, 2.0: {'n': 64, 'positive': 57, 'profit_mean': 7047.0625}, 3.0: {'n': 64, 'positive': 58, 'profit_mean': 11755.65625}, 4.0: {'n': 64, 'positive': 53, 'profit_mean': 12053.546875}, 5.0: {'n': 64, 'positive': 58, 'profit_mean': 14471.09375}}
+InpAutoBreakeven {'false': {'n': 80, 'positive': 71, 'profit_mean': 12064.1375}, 'true': {'n': 240, 'positive': 207, 'profit_mean': 9320.645833333334}}
+stress
+5 next risk 1.6105100000000006 loss fixed 4.900995010000009 loss variable 5.958470050650455
+10 next risk 2.5937424601000023 loss fixed 9.561792499119559 loss variable 14.8499118908748
+15 next risk 4.177248169415656 loss fixed 13.994164535871157 loss variable 27.509554292572247
+20 next risk 6.727499949325611 loss fixed 18.209306240276923 loss variable 44.211645283188496
+25 next risk 10.834705943388395 loss fixed 22.217864060085336 loss variable 63.67057087488129
+30 next risk 17.44940226888645 loss fixed 26.02996266117198 loss variable 82.14892702831705

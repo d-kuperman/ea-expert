@@ -1,0 +1,240 @@
+{
+  "audit": {
+    "F25": {
+      "rows": 480,
+      "unique_active": 320,
+      "parameters": {
+        "InpUseRangeA": [
+          "true",
+          "false"
+        ],
+        "InpCancelSecondEntry": [
+          "false",
+          "true"
+        ],
+        "InpStopLossPips": [
+          15.0,
+          20.0,
+          10.0,
+          5.0
+        ],
+        "InpRiskReward": [
+          2.0,
+          3.0,
+          5.0,
+          4.0,
+          1.0
+        ],
+        "InpAutoBreakeven": [
+          "false",
+          "true"
+        ],
+        "InpBreakevenPips": [
+          5.0,
+          10.0,
+          15.0
+        ]
+      },
+      "meta": {
+        "Title": "SETUP_B EURUSD,M15 2025.01.01-2025.12.31",
+        "Author": "MetaQuotes Ltd.",
+        "Revision": "1",
+        "Created": "2026-10-07T15:43:07Z",
+        "Company": "Copyright 2000-2026, MetaQuotes Ltd.",
+        "Version": "500",
+        "Build": "64",
+        "Server": "FivePercentOnline-Real",
+        "Deposit": "100000 USD",
+        "Leverage": "100",
+        "Condition": "0",
+        "sha256": "3bad8d07ced4ff62dd55be48698a7b491df5c82977ef8008d6ea83cb9e3dbc42"
+      }
+    },
+    "F26": {
+      "rows": 480,
+      "unique_active": 320,
+      "parameters": {
+        "InpUseRangeA": [
+          "true",
+          "false"
+        ],
+        "InpCancelSecondEntry": [
+          "false",
+          "true"
+        ],
+        "InpStopLossPips": [
+          20.0,
+          15.0,
+          10.0,
+          5.0
+        ],
+        "InpRiskReward": [
+          4.0,
+          5.0,
+          3.0,
+          2.0,
+          1.0
+        ],
+        "InpAutoBreakeven": [
+          "true",
+          "false"
+        ],
+        "InpBreakevenPips": [
+          5.0,
+          10.0,
+          15.0
+        ]
+      },
+      "meta": {
+        "Title": "SETUP_B EURUSD,M15 2026.01.01-2026.10.07",
+        "Author": "MetaQuotes Ltd.",
+        "Revision": "1",
+        "Created": "2026-10-07T13:47:31Z",
+        "Company": "Copyright 2000-2026, MetaQuotes Ltd.",
+        "Version": "500",
+        "Build": "64",
+        "Server": "FivePercentOnline-Real",
+        "Deposit": "100000 USD",
+        "Leverage": "100",
+        "Condition": "0",
+        "sha256": "ef41ccc1cc0857189d69b4ca185b93e246ca76ac51d82ada39984dd6baa03edb"
+      }
+    },
+    "V26": {
+      "rows": 576,
+      "unique_active": 384,
+      "parameters": {
+        "InpUseRangeA": [
+          "true",
+          "false"
+        ],
+        "InpCancelSecondEntry": [
+          "false",
+          "true"
+        ],
+        "InpStopLossPips": [
+          15.0,
+          20.0,
+          5.0,
+          10.0
+        ],
+        "InpRiskReward": [
+          5.0,
+          4.0,
+          3.0
+        ],
+        "InpAutoBreakeven": [
+          "false",
+          "true"
+        ],
+        "InpBreakevenPips": [
+          15.0,
+          10.0,
+          5.0
+        ],
+        "InpVariableRisk": [
+          "true",
+          "false"
+        ]
+      },
+      "meta": {
+        "Title": "SETUP_B EURUSD,M1 2026.01.01-2026.10.07",
+        "Author": "MetaQuotes Ltd.",
+        "Revision": "1",
+        "Created": "2026-10-07T17:38:59Z",
+        "Company": "Copyright 2000-2026, MetaQuotes Ltd.",
+        "Version": "500",
+        "Build": "64",
+        "Server": "FivePercentOnline-Real",
+        "Deposit": "100000 USD",
+        "Leverage": "100",
+        "Condition": "0",
+        "sha256": "b73b4ef6b01a3224919ed7ad758ed29cb5449a7126769f480e4684fbb9c69e46"
+      }
+    }
+  },
+  "summary": {
+    "F25": {
+      "n": 320,
+      "positive": 52,
+      "profit_mean": -6001.9375,
+      "profit_median": -6056.5,
+      "profit_min": -31243.0,
+      "profit_max": 20503.0,
+      "dd_median": 13.6032,
+      "dd_max": 34.4255,
+      "PF_median": 0.8168705,
+      "trades_min": 40.0,
+      "trades_max": 76.0
+    },
+    "F26": {
+      "n": 320,
+      "positive": 278,
+      "profit_mean": 10006.51875,
+      "profit_median": 7167.5,
+      "profit_min": -7266.0,
+      "profit_max": 66638.0,
+      "dd_median": 7.04355,
+      "dd_max": 29.0762,
+      "PF_median": 1.3996095,
+      "trades_min": 28.0,
+      "trades_max": 54.0
+    },
+    "V26_control": {
+      "n": 192,
+      "positive": 163,
+      "profit_mean": 9597.329375,
+      "profit_median": 8226.15,
+      "profit_min": -7122.0,
+      "profit_max": 47651.72,
+      "dd_median": 8.9766,
+      "dd_max": 24.0824,
+      "PF_median": 1.3984185,
+      "trades_min": 28.0,
+      "trades_max": 54.0
+    },
+    "V26_variable": {
+      "n": 192,
+      "positive": 166,
+      "profit_mean": 12340.14203125,
+      "profit_median": 11253.685000000001,
+      "profit_min": -48453.75,
+      "profit_max": 77369.99,
+      "dd_median": 10.4504,
+      "dd_max": 60.4795,
+      "PF_median": 1.439145,
+      "trades_min": 28.0,
+      "trades_max": 54.0
+    }
+  },
+  "cross": {
+    "n": 320,
+    "both_positive": 49,
+    "rank_correlation": 0.16184377313204915
+  },
+  "control": {
+    "n": 192,
+    "equal_rows": 0,
+    "max_abs_delta": {
+      "Result": 14.510000000000002,
+      "Profit": 29054.839999999997,
+      "Expected Payoff": 605.309167,
+      "Profit Factor": 0.22820099999999988,
+      "Recovery Factor": 0.9254090000000001,
+      "Sharpe Ratio": 1.5891819999999992,
+      "Custom": 0.0,
+      "Equity DD %": 12.071800000000001,
+      "Trades": 1.0
+    }
+  },
+  "variable_pair": {
+    "n": 192,
+    "higher_profit": 162,
+    "higher_dd": 187,
+    "higher_PF": 147,
+    "higher_Sharpe": 132,
+    "higher_recovery": 122,
+    "higher_return_DD": 130,
+    "different_trades": 16
+  }
+}
