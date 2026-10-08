@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.11"
+#property version   "1.12"
 #property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
@@ -23,9 +23,7 @@ input group "--- BE Automático ---"
 input double   InpBreakevenPips  = 0.0;             // Activación BE en pips (0=apagado; >0=encendido)
 
 input group "--- Ejecución ---"
-input double   InpRiskPercent   = 1.0;             // Riesgo base (% del balance por orden)
-input bool     InpVariableRisk  = false;           // Activar riesgo variable
-input double   InpRiskMultiplier = 1.10;           // Multiplicador del riesgo después de cada SL
+input double   InpRiskMultiplier = 0.0;            // Riesgo: 0=fijo al 1%; >0=multiplicador por SL (base 1%)
 input ulong    InpMagicNumber   = 26100702;         // Identificador exclusivo de este EA
 
 //--- RANGO_A ---
@@ -61,6 +59,7 @@ input bool     InpShowLabels     = true;             // Mostrar etiquetas con MA
 //| Constantes y prefijos de objetos                                 |
 //+------------------------------------------------------------------+
 #define OBJ_PREFIX "EA_HA_"
+const double BASE_RISK_PERCENT = 1.0; // Riesgo inicial y tras una ganancia (% del balance por orden)
 
 //+------------------------------------------------------------------+
 //| Variables globales para los extremos de los rangos               |
@@ -711,9 +710,9 @@ void ApplyRiskClose(double net_profit, bool losing_stop, int &stops)
 // Sólo se consulta al cambiar el historial o antes de enviar un nuevo setup.
 bool RefreshRisk()
 {
-   if(!InpVariableRisk)
+   if(InpRiskMultiplier <= 0.0)
    {
-      g_risk_percent = InpRiskPercent;
+      g_risk_percent = BASE_RISK_PERCENT;
       g_risk_dirty = false;
       return true;
    }
@@ -786,7 +785,7 @@ bool RefreshRisk()
          }
       }
    }
-   double risk = InpRiskPercent * MathPow(InpRiskMultiplier, stops);
+   double risk = BASE_RISK_PERCENT * MathPow(InpRiskMultiplier, stops);
    if(!MathIsValidNumber(risk) || risk <= 0.0)
    {
       Print("[SETUP B] Riesgo fuera del rango numérico. No se enviarán nuevas órdenes.");
@@ -1238,15 +1237,14 @@ int OnInit()
    if(!MathIsValidNumber(InpStopLossPips) || InpStopLossPips <= 0.0 ||
       !MathIsValidNumber(InpRiskReward) || InpRiskReward <= 0.0 ||
       !MathIsValidNumber(InpBreakevenPips) || InpBreakevenPips < 0.0 ||
-      !MathIsValidNumber(InpRiskPercent) || InpRiskPercent <= 0.0 ||
-      (InpVariableRisk && (!MathIsValidNumber(InpRiskMultiplier) || InpRiskMultiplier <= 0.0)) ||
+      !MathIsValidNumber(InpRiskMultiplier) || InpRiskMultiplier < 0.0 ||
       InpMagicNumber == 0)
    {
-      Print("[SETUP B] SL, RR, riesgo base y Magic deben ser positivos; multiplicador también si está habilitado. Activación BE debe ser >= 0 (0=apagado).");
+      Print("[SETUP B] SL, RR y Magic deben ser positivos. Multiplicador de riesgo debe ser >= 0 (0=fijo al 1%). Activación BE debe ser >= 0 (0=apagado).");
       return INIT_PARAMETERS_INCORRECT;
    }
    g_risk_dirty = true;
-   g_risk_percent = InpRiskPercent;
+   g_risk_percent = BASE_RISK_PERCENT;
    g_pending_risk_percent = -1.0;
    g_last_risk_check = 0;
 

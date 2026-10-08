@@ -1,6 +1,7 @@
-# SETUP B 1.10 — riesgo por porcentaje del balance
+# SETUP B 1.12 — riesgo por porcentaje del balance
 
-Los archivos actuales son `SETUP_B.mq5` y `SETUP_B.ex5` en la raíz del proyecto.
+El fuente actual es `SETUP_B.mq5` en la raíz del proyecto. La versión 1.12 no
+se compiló; el `SETUP_B.ex5` existente corresponde a una compilación anterior.
 Esta versión sustituye `InpLots` por el cálculo automático de lotes según el
 porcentaje del balance y la distancia entre entrada y SL. Los archivos antiguos
 de `Script Astra` conservan sus versiones anteriores.
@@ -9,19 +10,19 @@ de `Script Astra` conservan sus versiones anteriores.
 
 | Parámetro | Inicial | Uso |
 |---|---:|---|
-| Riesgo base (% del balance por orden) | 1.0 | Escribir 1 para arriesgar el 1% por orden. |
-| Activar riesgo variable | false | false mantiene el porcentaje base; true aplica la progresión. |
-| Multiplicador del riesgo después de cada SL | 1.10 | Está inmediatamente debajo del booleano. Admite enteros y decimales positivos. |
+| Riesgo: 0=fijo al 1%; >0=multiplicador por SL (base 1%) | 0.0 | 0 mantiene el 1% por orden; un valor positivo aplica la progresión. |
 | Identificador exclusivo de este EA | 26100702 | Separa el historial de esta estrategia. |
 
-El multiplicador sólo se valida y utiliza cuando el riesgo variable está activo.
+El riesgo base queda fijado al 1%; se eliminaron su entrada y el booleano de
+riesgo variable. El multiplicador se valida siempre: debe ser finito y >= 0.
+Con 0 no se aplica la progresión ni se consulta el historial de stops.
 Un valor 1 mantiene el porcentaje; uno mayor que 1 lo aumenta; uno entre 0 y 1
-lo reduce. Los ajustes anteriores que contengan `InpLots` deben migrarse al nuevo
-parámetro de porcentaje.
+lo reduce. Al cargar ajustes anteriores, revisar `InpRiskMultiplier`: ahora su
+valor determina directamente si se usa riesgo fijo o variable.
 
 ## Progresión
 
-`riesgo actual = riesgo base × multiplicador ^ cantidad de stops`
+`riesgo actual = 1% × multiplicador ^ cantidad de stops` (multiplicador > 0)
 
 Con base 1 y multiplicador 1.10: 1%, 1.10%, 1.21%, 1.331%, 1.4641%…
 La operación número 20, después de 19 stops, usa 6.115909…%, que se muestra
@@ -75,8 +76,8 @@ cancelarla conserva su volumen anterior.
 
 ## Verificación del 7 de octubre de 2026
 
-- Compilado con MetaEditor: **0 errores, 0 advertencias**. Registro:
-  `SETUP_B.compile.log`.
+- Versión 1.12 sin compilar, por pedido del usuario. El registro
+  `SETUP_B.compile.log` corresponde a una compilación anterior.
 - **55 comprobaciones de riesgo** y **19 de cancelación** aprobadas.
 - El verificador extrae las funciones del fuente actual y las ejecuta en C#,
   adaptando sintaxis y sustituyendo APIs de MT5 por simuladores. Comprueba

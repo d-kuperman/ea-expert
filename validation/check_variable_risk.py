@@ -75,8 +75,9 @@ public static class VariableRiskCheck {
  const int SYMBOL_VOLUME_MIN=1,SYMBOL_VOLUME_MAX=2,SYMBOL_VOLUME_STEP=3,ORDER_TYPE_BUY=0,ORDER_TYPE_SELL=1,ORDER_TYPE_BUY_STOP=4,ORDER_TYPE_SELL_STOP=5,ACCOUNT_BALANCE=1;
  const int ORDER_SYMBOL=1,ORDER_MAGIC=2,ORDER_TYPE=3,ORDER_VOLUME_CURRENT=4,ORDER_VOLUME_INITIAL=5,ORDER_PRICE_OPEN=6,ORDER_SL=7,ORDER_TP=8,ORDER_TYPE_TIME=9,ORDER_TIME_EXPIRATION=10,ORDER_COMMENT=11,ORDER_TIME_SETUP=12,ORDER_STATE=13;
  const int TRADE_ACTION_PENDING=5,TRADE_ACTION_REMOVE=8,ORDER_FILLING_RETURN=2,TIME_DATE=1,TRADE_RETCODE_DONE=10009,TRADE_RETCODE_PLACED=10008,ORDER_STATE_CANCELED=2;
- static bool InpVariableRisk=true,g_risk_dirty=true,historyOK=true,checkOK=true,removeOK=true,placeOK=true,cancelSetup=false,partialDuringCancel=false;
- static double InpRiskPercent=1,InpRiskMultiplier=1.1,g_risk_percent=1,g_pending_risk_percent=-1,balance=10000;
+ const double BASE_RISK_PERCENT=1;
+ static bool g_risk_dirty=true,historyOK=true,checkOK=true,removeOK=true,placeOK=true,cancelSetup=false,partialDuringCancel=false;
+ static double InpRiskMultiplier=1.1,g_risk_percent=1,g_pending_risk_percent=-1,balance=10000;
  static long g_last_risk_check=0,now=1791331200;
  static int passed=0,removals=0,placements=0;
  class Deal { public ulong id,position,magic=InpMagicNumber; public string symbol=_Symbol; public int entry,type,reason; public double volume=1,price=1.1,profit,cost,sl; }
@@ -116,7 +117,7 @@ public static class VariableRiskCheck {
   if(r.action==TRADE_ACTION_REMOVE) { if(!removeOK)return false; removedOrder=orders.Find(o=>o.id==r.order); orders.Remove(removedOrder); removedOrder.state=ORDER_STATE_CANCELED; if(partialDuringCancel) removedOrder.volume/=2; removals++; result.retcode=TRADE_RETCODE_DONE; return true; }
   placements++; lastPlaced=r; if(!placeOK)return false; result.retcode=TRADE_RETCODE_PLACED; result.order=999; orders.Add(new Order {id=999,volume=r.volume,initial=r.volume,comment=r.comment}); return true;
  }
- static void Reset() { deals.Clear(); orders.Clear(); InpVariableRisk=true; InpRiskPercent=1; InpRiskMultiplier=1.1; g_risk_percent=1; g_risk_dirty=true; g_pending_risk_percent=-1; g_last_risk_check=0; historyOK=checkOK=removeOK=placeOK=true; cancelSetup=partialDuringCancel=false; removals=placements=0; balance=10000; removedOrder=null; lastPlaced=null; }
+ static void Reset() { deals.Clear(); orders.Clear(); InpRiskMultiplier=1.1; g_risk_percent=1; g_risk_dirty=true; g_pending_risk_percent=-1; g_last_risk_check=0; historyOK=checkOK=removeOK=placeOK=true; cancelSetup=partialDuringCancel=false; removals=placements=0; balance=10000; removedOrder=null; lastPlaced=null; }
  static void Open(ulong id,bool buy=true,double volume=1) { deals.Add(new Deal {id=(ulong)deals.Count+1,position=id,type=buy?0:1,entry=0,volume=volume}); }
  static void Close(ulong id,double profit=-100,int reason=DEAL_REASON_SL,double volume=1,double sl=1.099,bool buy=true,double cost=0) { deals.Add(new Deal {id=(ulong)deals.Count+1,position=id,type=buy?1:0,entry=1,profit=profit,reason=reason,volume=volume,sl=sl,cost=cost}); }
  static void Assert(bool ok,string name) { if(!ok)throw new Exception("FAIL "+name); passed++; Console.WriteLine("PASS "+name); }
@@ -127,8 +128,8 @@ public static class VariableRiskCheck {
   for(ulong i=1;i<=19;i++) { Open(i); Close(i); Assert(Near(Risk(),Math.Pow(1.1,i)),"stop progression "+i); }
   Assert(Near(Math.Round(Risk(),2),6.12),"twentieth trade 6.12 percent");
   Assert(Near(Risk(),Risk()),"restart and repeated events do not double count");
-  InpVariableRisk=false; Assert(Near(Risk(),1),"fixed mode ignores stop history");
-  InpVariableRisk=true; Open(30); Close(30,200,DEAL_REASON_TP); Assert(Near(Risk(),1),"net winner resets");
+  InpRiskMultiplier=0; Assert(Near(Risk(),1),"zero multiplier keeps fixed 1 percent despite stop history");
+  InpRiskMultiplier=1.1; Open(30); Close(30,200,DEAL_REASON_TP); Assert(Near(Risk(),1),"net winner resets");
   Open(31); Close(31); Assert(Near(Risk(),1.1),"new cycle after winner");
   Open(32); Close(32,0,DEAL_REASON_SL,1,1.1,true,-5); Assert(Near(Risk(),1.1),"BE with fees does not multiply");
   Open(33); Close(33,-2,DEAL_REASON_SL,1,1.1); Assert(Near(Risk(),1.1),"BE with adverse slippage does not multiply");
