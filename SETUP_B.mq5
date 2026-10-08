@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.10"
+#property version   "1.11"
 #property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
@@ -20,8 +20,7 @@ input double   InpStopLossPips   = 10.0;            // SL en pips
 input double   InpRiskReward     = 2.0;             // RR
 
 input group "--- BE Automático ---"
-input bool     InpAutoBreakeven  = false;           // Activar BE automático (true=Sí / false=No)
-input double   InpBreakevenPips  = 10.0;            // Activación en pips
+input double   InpBreakevenPips  = 0.0;             // Activación BE en pips (0=apagado; >0=encendido)
 
 input group "--- Ejecución ---"
 input double   InpRiskPercent   = 1.0;             // Riesgo base (% del balance por orden)
@@ -1177,7 +1176,7 @@ void PlaceSetupOrders()
 
 void ManageBreakeven()
 {
-   if(!InpAutoBreakeven || !TradingAllowed()) return;
+   if(InpBreakevenPips <= 0.0 || !TradingAllowed()) return;
    MqlTick tick;
    if(!SymbolInfoTick(_Symbol, tick)) return;
    double trigger = InpBreakevenPips * PipSize();
@@ -1238,12 +1237,12 @@ int OnInit()
 
    if(!MathIsValidNumber(InpStopLossPips) || InpStopLossPips <= 0.0 ||
       !MathIsValidNumber(InpRiskReward) || InpRiskReward <= 0.0 ||
-      (InpAutoBreakeven && (!MathIsValidNumber(InpBreakevenPips) || InpBreakevenPips <= 0.0)) ||
+      !MathIsValidNumber(InpBreakevenPips) || InpBreakevenPips < 0.0 ||
       !MathIsValidNumber(InpRiskPercent) || InpRiskPercent <= 0.0 ||
       (InpVariableRisk && (!MathIsValidNumber(InpRiskMultiplier) || InpRiskMultiplier <= 0.0)) ||
       InpMagicNumber == 0)
    {
-      Print("[SETUP B] SL, RR, riesgo base y Magic deben ser positivos; multiplicador y activación BE también si están habilitados.");
+      Print("[SETUP B] SL, RR, riesgo base y Magic deben ser positivos; multiplicador también si está habilitado. Activación BE debe ser >= 0 (0=apagado).");
       return INIT_PARAMETERS_INCORRECT;
    }
    g_risk_dirty = true;
