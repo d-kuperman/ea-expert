@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Dany"
 #property link      "https://www.mql5.com"
-#property version   "1.13"
+#property version   "1.14"
 #property description "Asesor Experto con velas normales M15, Rangos A, B, C y división de días (UTC+3 The5ers) [Optimizado]"
 
 //+------------------------------------------------------------------+
@@ -14,6 +14,7 @@
 input group "-- ENTRADAS RANGO_A / RANGO_B ---"
 input bool     InpUseRangeA      = true;            // RANGO_A (true) / RANGO_B (false)
 input bool     InpCancelSecondEntry = true;         // TRUE CANCELA LA ORDEN PENDIENTE - FALSE CANCELA AL CERRAR
+input bool     InpKeepPendingOrders = false;        // Mantener pendientes tras el cierre del día (false=cancelar)
 
 input group "--- BUY / SELL STOP ---"
 input double   InpStopLossPips   = 10.0;            // SL en pips
@@ -80,6 +81,7 @@ datetime g_last_be_error = 0;
 datetime g_last_oco_check = 0;
 datetime g_last_oco_error = 0;
 datetime g_last_expiry_error = 0;
+datetime g_last_expiry_check = 0;
 bool g_risk_dirty = true;
 double g_risk_percent = 0.0;
 double g_pending_risk_percent = -1.0;
@@ -865,9 +867,10 @@ bool SetupOrderAlreadyExists(ENUM_ORDER_TYPE type, datetime day_start)
 // Vencimiento de la pendiente, sin afectar el SL/TP de una posición ejecutada.
 void SetPendingExpiry(MqlTradeRequest &request, datetime setup_day)
 {
-   long modes = SymbolInfoInteger(_Symbol, SYMBOL_EXPIRATION_MODE);
    request.type_time = ORDER_TIME_GTC;
    request.expiration = 0;
+   if(InpKeepPendingOrders) return;
+   long modes = SymbolInfoInteger(_Symbol, SYMBOL_EXPIRATION_MODE);
    if((modes & SYMBOL_EXPIRATION_SPECIFIED) != 0)
    {
       request.type_time = ORDER_TIME_SPECIFIED;
@@ -878,14 +881,15 @@ void SetPendingExpiry(MqlTradeRequest &request, datetime setup_day)
       request.type_time = ORDER_TIME_SPECIFIED_DAY;
       request.expiration = setup_day + 86399;
    }
-   // Sin vencimiento compatible, CancelExpiredSetupOrders limpia en el próximo tick.
+   // Sin vencimiento compatible, ReconcilePendingExpiry limpia en el próximo tick.
 }
 
 // También recupera pendientes de días anteriores después de un reinicio.
-// Sólo elimina órdenes pendientes propias; nunca cierra posiciones abiertas.
-void CancelExpiredSetupOrders()
+// Sincroniza el vencimiento al cambiar el bool; nunca cierra posiciones abiertas.
+void ReconcilePendingExpiry()
 {
-   if(!TradingAllowed()) return;
+   if(!TradingAllowed() || g_last_expiry_check == TimeCurrent()) return;
+   g_last_expiry_check = TimeCurrent();
    datetime today = GetDayStart(TimeCurrent());
    for(int i = OrdersTotal() - 1; i >= 0; i--)
    {
@@ -895,19 +899,38 @@ void CancelExpiredSetupOrders()
       ENUM_ORDER_TYPE type = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
       if(type != ORDER_TYPE_BUY_STOP && type != ORDER_TYPE_SELL_STOP) continue;
       datetime day = SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP));
-      if(day >= today) continue;
       MqlTradeRequest request = {};
       MqlTradeResult result = {};
-      request.action = TRADE_ACTION_REMOVE;
       request.order = ticket;
       request.symbol = _Symbol;
       request.magic = InpMagicNumber;
+      bool expired = (!InpKeepPendingOrders && day < today);
+      if(expired)
+         request.action = TRADE_ACTION_REMOVE;
+      else
+      {
+         SetPendingExpiry(request, day);
+         if(request.type_time == (ENUM_ORDER_TYPE_TIME)OrderGetInteger(ORDER_TYPE_TIME) &&
+            request.expiration == (datetime)OrderGetInteger(ORDER_TIME_EXPIRATION)) continue;
+         request.action = TRADE_ACTION_MODIFY;
+         request.price = OrderGetDouble(ORDER_PRICE_OPEN);
+         request.sl = OrderGetDouble(ORDER_SL);
+         request.tp = OrderGetDouble(ORDER_TP);
+         request.stoplimit = OrderGetDouble(ORDER_PRICE_STOPLIMIT);
+      }
       if(OrderSend(request, result) && result.retcode == TRADE_RETCODE_DONE)
-         PrintFormat("[SETUP B] Fin de día: pendiente #%I64u cancelada (setup %s).", ticket, TimeToString(day, TIME_DATE));
+      {
+         if(expired)
+            PrintFormat("[SETUP B] Fin de día: pendiente #%I64u cancelada (setup %s).", ticket, TimeToString(day, TIME_DATE));
+         else
+            PrintFormat("[SETUP B] Vencimiento de pendiente #%I64u actualizado: %s.", ticket,
+                        InpKeepPendingOrders ? "sin vencimiento diario" : "al cierre del día");
+      }
       else if(g_last_expiry_error == 0 || TimeCurrent() - g_last_expiry_error >= 60)
       {
          g_last_expiry_error = TimeCurrent();
-         PrintFormat("[SETUP B] No se pudo cancelar pendiente vencida #%I64u: %u, %s. Se reintentará.", ticket, result.retcode, result.comment);
+         PrintFormat("[SETUP B] No se pudo %s pendiente #%I64u: %u, %s. Se reintentará.",
+                     expired ? "cancelar" : "actualizar vencimiento de", ticket, result.retcode, result.comment);
       }
    }
 }
@@ -1130,7 +1153,7 @@ void ReconcilePendingRisk()
       replacement.expiration = (datetime)OrderGetInteger(ORDER_TIME_EXPIRATION);
       replacement.type_filling = ORDER_FILLING_RETURN;
       datetime day = SetupOrderDay(OrderGetString(ORDER_COMMENT), (datetime)OrderGetInteger(ORDER_TIME_SETUP));
-      if(day < GetDayStart(TimeCurrent())) { complete = false; continue; }
+      if(!InpKeepPendingOrders && day < GetDayStart(TimeCurrent())) { complete = false; continue; }
       SetPendingExpiry(replacement, day);
       replacement.comment = "SETUP B " + TimeToString(day, TIME_DATE) + (type == ORDER_TYPE_BUY_STOP ? " BUY" : " SELL");
       double previous_volume = OrderGetDouble(ORDER_VOLUME_CURRENT);
@@ -1162,7 +1185,8 @@ void ReconcilePendingRisk()
          PrintFormat("[SETUP B] No se repone #%I64u: no se confirmó cancelación íntegra sin ejecuciones.", ticket);
          continue;
       }
-      if(day < GetDayStart(TimeCurrent()) || !HistorySelect(day, TimeCurrent()) || SetupHasCancellation(day)) continue;
+      if((!InpKeepPendingOrders && day < GetDayStart(TimeCurrent())) ||
+         !HistorySelect(day, TimeCurrent()) || SetupHasCancellation(day)) continue;
       MqlTradeResult placed = {};
       if(!OrderSend(replacement, placed) ||
          (placed.retcode != TRADE_RETCODE_DONE && placed.retcode != TRADE_RETCODE_PLACED))
@@ -1300,6 +1324,7 @@ int OnInit()
    g_risk_percent = BASE_RISK_PERCENT;
    g_pending_risk_percent = -1.0;
    g_last_risk_check = 0;
+   g_last_expiry_check = 0;
 
    // Parsear horarios configurados
    int h_sa, m_sa, h_ea, m_ea;
@@ -1363,7 +1388,7 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   CancelExpiredSetupOrders();
+   ReconcilePendingExpiry();
    ReconcileSetupOCO();
    ReconcilePendingRisk();
    // Gestionar posiciones aun si la historia de rangos todavía no está lista.
