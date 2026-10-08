@@ -18,6 +18,7 @@ def function(name):
         end += 1
     result = source[start:end]
     result = re.sub(r'(int|double|datetime|ENUM_ORDER_TYPE) &(\w+)', r'ref \1 \2', result)
+    result = result.replace('MqlTradeRequest &request', 'MqlTradeRequest request')
     result = result.replace('RiskPosition positions[];', 'RiskPosition[] positions = new RiskPosition[0];')
     result = result.replace('ArrayResize(positions,', 'ArrayResize(ref positions,')
     result = result.replace('ZeroMemory(positions[p]);', 'positions[p] = new RiskPosition();')
@@ -76,6 +77,8 @@ public static class VariableRiskCheck {
  const int ORDER_SYMBOL=1,ORDER_MAGIC=2,ORDER_TYPE=3,ORDER_VOLUME_CURRENT=4,ORDER_VOLUME_INITIAL=5,ORDER_PRICE_OPEN=6,ORDER_SL=7,ORDER_TP=8,ORDER_TYPE_TIME=9,ORDER_TIME_EXPIRATION=10,ORDER_COMMENT=11,ORDER_TIME_SETUP=12,ORDER_STATE=13;
  const int TRADE_ACTION_PENDING=5,TRADE_ACTION_REMOVE=8,ORDER_FILLING_RETURN=2,TIME_DATE=1,TRADE_RETCODE_DONE=10009,TRADE_RETCODE_PLACED=10008,ORDER_STATE_CANCELED=2;
  const double BASE_RISK_PERCENT=1;
+ const int SYMBOL_EXPIRATION_MODE=100, SYMBOL_EXPIRATION_SPECIFIED=4, SYMBOL_EXPIRATION_SPECIFIED_DAY=8, ORDER_TIME_GTC=0, ORDER_TIME_SPECIFIED=2, ORDER_TIME_SPECIFIED_DAY=3;
+ static long expiryModes=4,g_last_expiry_error=0;
  static bool g_risk_dirty=true,historyOK=true,checkOK=true,removeOK=true,placeOK=true,cancelSetup=false,partialDuringCancel=false;
  static double InpRiskMultiplier=1.1,g_risk_percent=1,g_pending_risk_percent=-1,balance=10000;
  static long g_last_risk_check=0,now=1791331200;
@@ -94,6 +97,7 @@ public static class VariableRiskCheck {
  static double NormalizeDouble(double a,int n) { return Math.Round(a,n); }
  static void Print(string s) {} static void PrintFormat(string s,params object[] a) {}
  static long TimeCurrent() { return now; } static bool TradingAllowed() { return true; }
+ static long SymbolInfoInteger(string s,int p) { return expiryModes; }
  static int StringFind(string s,string x) { return s.IndexOf(x,StringComparison.Ordinal); } static int StringLen(string s) { return s.Length; } static string StringSubstr(string s,int a,int b) { return s.Substring(a,b); }
  static long StringToTime(string s) { DateTime d; return DateTime.TryParseExact(s,"yyyy.MM.dd",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out d) ? (long)(d-new DateTime(1970,1,1)).TotalSeconds : 0; }
  static long GetDayStart(long t) { return t-t%86400; } static string TimeToString(long t,int f) { return new DateTime(1970,1,1).AddSeconds(t).ToString("yyyy.MM.dd"); }
@@ -117,7 +121,7 @@ public static class VariableRiskCheck {
   if(r.action==TRADE_ACTION_REMOVE) { if(!removeOK)return false; removedOrder=orders.Find(o=>o.id==r.order); orders.Remove(removedOrder); removedOrder.state=ORDER_STATE_CANCELED; if(partialDuringCancel) removedOrder.volume/=2; removals++; result.retcode=TRADE_RETCODE_DONE; return true; }
   placements++; lastPlaced=r; if(!placeOK)return false; result.retcode=TRADE_RETCODE_PLACED; result.order=999; orders.Add(new Order {id=999,volume=r.volume,initial=r.volume,comment=r.comment}); return true;
  }
- static void Reset() { deals.Clear(); orders.Clear(); InpRiskMultiplier=1.1; g_risk_percent=1; g_risk_dirty=true; g_pending_risk_percent=-1; g_last_risk_check=0; historyOK=checkOK=removeOK=placeOK=true; cancelSetup=partialDuringCancel=false; removals=placements=0; balance=10000; removedOrder=null; lastPlaced=null; }
+ static void Reset() { deals.Clear(); orders.Clear(); now=1791158400; expiryModes=4; g_last_expiry_error=0; InpRiskMultiplier=1.1; g_risk_percent=1; g_risk_dirty=true; g_pending_risk_percent=-1; g_last_risk_check=0; historyOK=checkOK=removeOK=placeOK=true; cancelSetup=partialDuringCancel=false; removals=placements=0; balance=10000; removedOrder=null; lastPlaced=null; }
  static void Open(ulong id,bool buy=true,double volume=1) { deals.Add(new Deal {id=(ulong)deals.Count+1,position=id,type=buy?0:1,entry=0,volume=volume}); }
  static void Close(ulong id,double profit=-100,int reason=DEAL_REASON_SL,double volume=1,double sl=1.099,bool buy=true,double cost=0) { deals.Add(new Deal {id=(ulong)deals.Count+1,position=id,type=buy?1:0,entry=1,profit=profit,reason=reason,volume=volume,sl=sl,cost=cost}); }
  static void Assert(bool ok,string name) { if(!ok)throw new Exception("FAIL "+name); passed++; Console.WriteLine("PASS "+name); }
@@ -161,10 +165,20 @@ public static class VariableRiskCheck {
   Reset(); Open(1); Close(1); orders.Add(new Order {volume=0.5}); ReconcilePendingRisk(); Assert(removals==0,"partially filled pending is not increased");
   Reset(); Open(1); Close(1); orders.Add(new Order()); placeOK=false; ReconcilePendingRisk(); now++; ReconcilePendingRisk(); Assert(placements==1&&orders.Count==0,"rejected replacement is not blindly duplicated");
   Assert(SetupOrderDay("SETUP B 2026.10.05 SELL",now)==StringToTime("2026.10.05"),"setup identity survives next day");
+  Reset(); var expiry=new MqlTradeRequest(); SetPendingExpiry(expiry,now); Assert(expiry.type_time==ORDER_TIME_SPECIFIED&&expiry.expiration==now+86400,"server expiry at next midnight");
+  expiryModes=8; SetPendingExpiry(expiry,now); Assert(expiry.type_time==ORDER_TIME_SPECIFIED_DAY&&expiry.expiration==now+86399,"specified day expiry supported");
+  expiryModes=1; SetPendingExpiry(expiry,now); Assert(expiry.type_time==ORDER_TIME_GTC&&expiry.expiration==0,"unsupported expiry uses tick cleanup");
+  Reset(); orders.Add(new Order()); now+=86399; CancelExpiredSetupOrders(); Assert(removals==0,"same day pending retained");
+  now++; Open(1); CancelExpiredSetupOrders(); Assert(removals==1&&orders.Count==0&&deals.Count==1,"midnight removes pending without closing open position");
+  Reset(); orders.Add(new Order()); now+=86400; removeOK=false; CancelExpiredSetupOrders(); Assert(orders.Count==1,"failed expiry cancellation retains pending for retry");
+  Open(1); Close(1); ReconcilePendingRisk(); Assert(placements==0&&removals==0,"expired pending never resized or recreated");
+  removeOK=true; CancelExpiredSetupOrders(); Assert(orders.Count==0,"expiry cancellation retries successfully");
+  Reset(); orders.Add(new Order {magic=7}); orders.Add(new Order {id=101,symbol="GBPUSD"}); now+=86400; CancelExpiredSetupOrders(); Assert(removals==0&&orders.Count==2,"expiry ignores other symbol and magic");
+  Reset(); orders.Add(new Order {volume=0.5}); Open(1, true, 0.5); now+=86400; CancelExpiredSetupOrders(); Assert(removals==1&&deals.Count==1,"expiry removes unfilled remainder and preserves executed portion");
   return passed;
  }
 '''
-functions = '\n'.join(function(n) for n in ['SetupOrderDay','ApplyRiskClose','RefreshRisk','RiskVolume','CalculateRiskVolume','ReconcilePendingRisk'])
+functions = '\n'.join(function(n) for n in ['SetupOrderDay','ApplyRiskClose','RefreshRisk','RiskVolume','CalculateRiskVolume','SetPendingExpiry','CancelExpiredSetupOrders','ReconcilePendingRisk'])
 with tempfile.TemporaryDirectory(prefix='setup_b_risk_') as tmp:
     risk_path = Path(tmp) / 'risk.cs'
     cancel_path = Path(tmp) / 'cancellation.cs'

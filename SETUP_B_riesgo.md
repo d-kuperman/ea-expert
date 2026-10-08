@@ -1,6 +1,6 @@
-# SETUP B 1.12 — riesgo por porcentaje del balance
+# SETUP B 1.13 — riesgo por porcentaje del balance
 
-El fuente actual es `SETUP_B.mq5` en la raíz del proyecto. La versión 1.12 no
+El fuente actual es `SETUP_B.mq5` en la raíz del proyecto. La versión 1.13 no
 se compiló; el `SETUP_B.ex5` existente corresponde a una compilación anterior.
 Esta versión sustituye `InpLots` por el cálculo automático de lotes según el
 porcentaje del balance y la distancia entre entrada y SL. Los archivos antiguos
@@ -51,6 +51,22 @@ El porcentaje es **por orden**, no el total combinado de ambas entradas.
 
 ## Volumen y pendientes
 
+Las pendientes BUY STOP / SELL STOP del EA vencen al terminar el día del setup
+(medianoche del servidor, el mismo reloj usado por los rangos). Se usa vencimiento
+en el servidor si el símbolo admite `ORDER_TIME_SPECIFIED` o
+`ORDER_TIME_SPECIFIED_DAY`. En este último modo, si el final del día cae fuera
+de sesión, el servidor puede aplazar el vencimiento al siguiente horario de trading.
+Además, al primer tick del nuevo día se cancelan las pendientes de días anteriores,
+incluidas las recuperadas tras reiniciar el EA. Si se rechaza la cancelación,
+se reintenta en los ticks siguientes. Sin vencimiento compatible, la limpieza
+requiere que el EA esté conectado y pueda operar.
+
+Esta limpieza sólo envía solicitudes de eliminación de pendientes del símbolo
+y Magic del EA. No cierra posiciones abiertas ni elimina sus SL/TP; el BE sigue
+gestionándose normalmente. Un remanente pendiente de una ejecución parcial se
+cancela, conservando la parte ya ejecutada. Las pendientes vencidas no se
+recrean al actualizar el riesgo.
+
 La pérdida estimada entre entrada y SL se convierte a moneda de la cuenta con
 [OrderCalcProfit](https://www.mql5.com/en/docs/trading/ordercalcprofit).
 Los lotes se redondean hacia abajo al paso permitido. Si el volumen requerido
@@ -76,9 +92,9 @@ cancelarla conserva su volumen anterior.
 
 ## Verificación del 7 de octubre de 2026
 
-- Versión 1.12 sin compilar, por pedido del usuario. El registro
+- Versión 1.13 sin compilar, por pedido del usuario. El registro
   `SETUP_B.compile.log` corresponde a una compilación anterior.
-- **55 comprobaciones de riesgo** y **19 de cancelación** aprobadas.
+- **65 comprobaciones de riesgo y vencimiento** y **19 de cancelación** aprobadas.
 - El verificador extrae las funciones del fuente actual y las ejecuta en C#,
   adaptando sintaxis y sustituyendo APIs de MT5 por simuladores. Comprueba
   progresión, ganancias, BE, parciales, reinicios, filtro de estrategia,
